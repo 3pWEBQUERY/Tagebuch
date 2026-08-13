@@ -11,7 +11,12 @@ import {
   type ReactNode,
 } from "react";
 import * as db from "./db";
-import { logout as endSession, readSession, type SessionUser } from "./auth";
+import {
+  deleteAccount as deleteAccountRequest,
+  logout as endSession,
+  readSession,
+  type SessionUser,
+} from "./auth";
 import {
   adoptUser,
   clearLocalData,
@@ -57,6 +62,7 @@ type Store = {
   session: Session;
   signIn: (user: SessionUser) => Promise<void>;
   signOut: (options?: { force?: boolean }) => Promise<"ok" | "unsynced">;
+  deleteAccount: () => Promise<void>;
   save: (entry: Entry) => Promise<void>;
   remove: (id: string, options?: { undo?: boolean }) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -217,6 +223,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [runSync],
   );
 
+  const deleteAccount = useCallback(async () => {
+    await deleteAccountRequest();
+    await clearLocalData();
+    setEntries([]);
+    setSession((s) => ({ ...s, user: null, checked: true }));
+    setSync({ status: "locked", lastSyncedAt: null, error: null });
+  }, []);
+
   /** Nach Änderungen kurz warten – Tippen soll nicht jeden Anschlag hochladen. */
   const scheduleSync = useCallback(() => {
     if (syncTimer.current) window.clearTimeout(syncTimer.current);
@@ -357,6 +371,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       session,
       signIn,
       signOut,
+      deleteAccount,
       save,
       remove,
       toggleFavorite,
@@ -378,6 +393,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       session,
       signIn,
       signOut,
+      deleteAccount,
       save,
       remove,
       toggleFavorite,

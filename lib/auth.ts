@@ -47,3 +47,8 @@ export async function register(
 export async function logout(): Promise<void> {
   await fetch("/api/auth/session", { method: "DELETE" });
 }
+
+export async function deleteAccount(): Promise<void> {
+  const response = await fetch("/api/auth/account", { method: "DELETE" });
+  if (!response.ok) throw new Error(await readError(response, "Konto konnte nicht gelöscht werden"));
+}

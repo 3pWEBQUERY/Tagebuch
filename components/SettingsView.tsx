@@ -36,10 +36,12 @@ export function SettingsView({ install }: { install: InstallState }) {
     syncNow,
     session,
     signOut,
+    deleteAccount,
   } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [askWipe, setAskWipe] = useState(false);
   const [askSignOut, setAskSignOut] = useState(false);
+  const [askDeleteAccount, setAskDeleteAccount] = useState(false);
 
   const themeIndex = THEMES.findIndex((t) => t.id === theme);
 
@@ -218,9 +220,14 @@ export function SettingsView({ install }: { install: InstallState }) {
               }}
             />
           </div>
-          <button className="btn btnDanger btnFull" type="button" onClick={() => setAskWipe(true)}>
-            Alle Einträge löschen
-          </button>
+          <div className="btnRow" style={{ marginBottom: 0 }}>
+            <button className="btn btnDanger" type="button" onClick={() => setAskWipe(true)}>
+              Alle Einträge löschen
+            </button>
+            <button className="btn btnDanger" type="button" onClick={() => setAskDeleteAccount(true)}>
+              Konto löschen
+            </button>
+          </div>
         </section>
 
         <section className="card glass" aria-labelledby="app-h">
@@ -261,6 +268,22 @@ export function SettingsView({ install }: { install: InstallState }) {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={askDeleteAccount}
+        title="Konto endgültig löschen?"
+        text="Dein Konto und alle Einträge werden aus der Datenbank entfernt. Das lässt sich nicht rückgängig machen – exportiere vorher, wenn du etwas behalten willst."
+        confirmLabel="Konto löschen"
+        onCancel={() => setAskDeleteAccount(false)}
+        onConfirm={async () => {
+          setAskDeleteAccount(false);
+          try {
+            await deleteAccount();
+          } catch (err) {
+            toast(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={askSignOut}
