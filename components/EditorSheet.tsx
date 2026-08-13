@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { countWords, stamp } from "@/lib/format";
+import { photoUrl, preparePhoto, uploadPhoto } from "@/lib/photo";
 import { useStore } from "@/lib/store";
 import { MOODS, type Entry, type MoodValue, type Visibility } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { IconClose, IconGlobe, IconHeart, IconLock, IconTrash } from "./icons";
+import { IconCamera, IconClose, IconGlobe, IconHeart, IconLock, IconTrash } from "./icons";
 
 const AUTOSAVE_MS = 700;
 const CLOSE_MS = 180;
@@ -31,6 +32,11 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
   const [tags, setTags] = useState<string[]>(entry.tags);
   const [favorite, setFavorite] = useState(entry.favorite);
   const [visibility, setVisibility] = useState<Visibility>(entry.visibility);
+  const [photoId, setPhotoId] = useState<string | null>(entry.photoId);
+  /** Solange das Bild hochlädt, zeigt die Vorschau schon das gewählte Foto. */
+  const [preview, setPreview] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [tagDraft, setTagDraft] = useState("");
   const [savedHint, setSavedHint] = useState("");
   const [closing, setClosing] = useState(false);
@@ -47,15 +53,17 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
       mood,
       tags,
       favorite,
+      photoId,
       visibility,
       // Der erste Wechsel auf öffentlich setzt den Zeitpunkt; danach bleibt er.
       publishedAt: visibility === "public" ? (entry.publishedAt ?? Date.now()) : null,
       updatedAt: Date.now(),
     }),
-    [entry, title, body, mood, tags, favorite, visibility],
+    [entry, title, body, mood, tags, favorite, photoId, visibility],
   );
 
-  const hasContent = title.trim() !== "" || body.trim() !== "" || tags.length > 0 || mood !== null;
+  const hasContent =
+    title.trim() !== "" || body.trim() !== "" || tags.length > 0 || mood !== null || photoId !== null;
 
   /* Dialog öffnen + Fokus setzen */
   useEffect(() => {
@@ -94,7 +102,7 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
-  }, [title, body, mood, tags, favorite, visibility, hasContent, current, save, flash]);
+  }, [title, body, mood, tags, favorite, photoId, visibility, hasContent, current, save, flash]);
 
   const mark = () => {
     dirty.current = true;
@@ -130,6 +138,23 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
     });
   }
 
+  async function choosePhoto(file: File) {
+    setPhotoBusy(true);
+    try {
+      const prepared = await preparePhoto(file);
+      setPreview(prepared.preview);
+      const photo = await uploadPhoto(prepared);
+      mark();
+      setPhotoId(photo.id);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Bild konnte nicht geladen werden");
+      setPreview(null);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  const shownPhoto = preview ?? (photoId ? photoUrl(photoId) : null);
   const words = countWords(`${title} ${body}`);
 
   return (
@@ -198,6 +223,49 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
               maxLength={120}
               autoComplete="off"
             />
+
+            <div className="photoField">
+              {shownPhoto ? (
+                <div className="photoPreview">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={shownPhoto} alt="Gewähltes Bild" />
+                  {photoBusy && <span className="photoBusy">wird geladen …</span>}
+                  <button
+                    className="iconBtn photoRemove"
+                    type="button"
+                    aria-label="Bild entfernen"
+                    onClick={() => {
+                      mark();
+                      setPhotoId(null);
+                      setPreview(null);
+                    }}
+                  >
+                    <IconClose />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="photoAdd"
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={photoBusy}
+                >
+                  <IconCamera />
+                  <span>{photoBusy ? "Bild wird vorbereitet …" : "Bild hinzufügen"}</span>
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void choosePhoto(file);
+                  e.target.value = "";
+                }}
+              />
+            </div>
 
             <fieldset className="moods">
               <legend className="moodsLegend">Wie fühlst du dich?</legend>

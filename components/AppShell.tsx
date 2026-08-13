@@ -3,15 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScrolledPast } from "@/lib/client-value";
 import { useInstallPrompt } from "@/lib/install";
+import * as social from "@/lib/social";
 import { useStore } from "@/lib/store";
 import type { Entry, FeedItem } from "@/lib/types";
 import { AuthScreen } from "./AuthScreen";
 import { EditorSheet } from "./EditorSheet";
 import { FeedView } from "./FeedView";
-import { IconPlus } from "./icons";
+import { IconBell, IconPlus } from "./icons";
 import { InsightsView } from "./InsightsView";
 import { JournalView, type Filter } from "./JournalView";
+import { NotificationsSheet } from "./NotificationsSheet";
 import { PostSheet } from "./PostSheet";
+import { ReportDialog, type ReportTarget } from "./ReportDialog";
 import { ProfileView } from "./ProfileView";
 import { SettingsView } from "./SettingsView";
 import { TabBar, type ViewId } from "./TabBar";
@@ -42,6 +45,7 @@ function createEntry(): Entry {
     mood: null,
     tags: [],
     favorite: false,
+    photoId: null,
     // Privat ist der Ausgangspunkt – veröffentlicht wird nur auf Ansage.
     visibility: "private",
     publishedAt: null,
@@ -60,6 +64,10 @@ export function AppShell() {
   const [editing, setEditing] = useState<{ entry: Entry; isNew: boolean } | null>(null);
   const [post, setPost] = useState<FeedItem | null>(null);
   const [socialVersion, setSocialVersion] = useState(0);
+  const [menuItem, setMenuItem] = useState<FeedItem | null>(null);
+  const [report, setReport] = useState<ReportTarget | null>(null);
+  const [showNotes, setShowNotes] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   const scrolled = useScrolledPast(44);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -136,6 +144,44 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [editing, post, openNew, go]);
 
+  /* Ungelesenes zählen – beim Start, bei Rückkehr zum Tab und im Ruhetakt.
+     Ein Push-Dienst bräuchte eigene Schlüssel und die Erlaubnis des Geräts;
+     das ist ein eigener Schritt, kein Nebenprodukt. */
+  useEffect(() => {
+    if (!session.user) return;
+    let alive = true;
+    const check = () => {
+      social
+        .fetchNotifications()
+        .then(({ unread: count }) => {
+          if (alive) setUnread(count);
+        })
+        .catch(() => undefined);
+    };
+    check();
+    const timer = window.setInterval(check, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [session.user, socialVersion]);
+
+  async function blockFromMenu(item: FeedItem) {
+    setMenuItem(null);
+    try {
+      await social.setBlock(item.author.handle, true);
+      toast(`@${item.author.handle} ist blockiert`);
+      setSocialVersion((v) => v + 1);
+    } catch {
+      toast("Blockieren hat nicht geklappt");
+    }
+  }
+
   /* Service Worker: offline-fähig + Hinweis auf neue Version */
   useEffect(() => {
     if (!("serviceWorker" in navigator) || process.env.NODE_ENV !== "production") return;
@@ -204,7 +250,6 @@ export function AppShell() {
 
       <header className={`topbar${scrolled ? " topbarSolid" : ""}`}>
         <div className="topbarInner">
-          <span className="topbarSpacer" aria-hidden="true" />
           <h2 className="topbarTitle">{TITLES[screen]}</h2>
           <button
             className="iconBtn topbarAction"
@@ -214,6 +259,19 @@ export function AppShell() {
             onClick={openNew}
           >
             <IconPlus />
+          </button>
+          <button
+            className="iconBtn topbarBell"
+            type="button"
+            aria-label={unread > 0 ? `Benachrichtigungen (${unread} neu)` : "Benachrichtigungen"}
+            onClick={() => setShowNotes(true)}
+          >
+            <IconBell />
+            {unread > 0 && (
+              <span className="bellDot" aria-hidden="true">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -234,6 +292,7 @@ export function AppShell() {
           <FeedView
             onOpenPost={setPost}
             onOpenProfile={openProfile}
+            onMenu={setMenuItem}
             refreshToken={socialVersion}
           />
         )}
@@ -245,6 +304,8 @@ export function AppShell() {
             onOpenPost={setPost}
             onOpenProfile={openProfile}
             onOpenSettings={() => go("settings", { back: "profile" })}
+            onMenu={setMenuItem}
+            onReport={(handle) => setReport({ handle, label: `@${handle}` })}
             refreshToken={socialVersion}
           />
         )}
@@ -293,6 +354,57 @@ export function AppShell() {
           onClose={() => setPost(null)}
           onOpenProfile={openProfile}
           onChanged={setPost}
+        />
+      )}
+
+      {menuItem && (
+        <div
+          className="actionSheet"
+          role="dialog"
+          aria-label="Beitragsoptionen"
+          onClick={(e) => {
+            if (e.currentTarget === e.target) setMenuItem(null);
+          }}
+        >
+          <div className="actionCard glass">
+            <p className="actionTitle">Beitrag von @{menuItem.author.handle}</p>
+            <button
+              className="actionRow"
+              type="button"
+              onClick={() => {
+                setReport({
+                  entryId: menuItem.id,
+                  handle: menuItem.author.handle,
+                  label: "diesen Beitrag",
+                });
+                setMenuItem(null);
+              }}
+            >
+              Beitrag melden
+            </button>
+            <button
+              className="actionRow actionRowDanger"
+              type="button"
+              onClick={() => void blockFromMenu(menuItem)}
+            >
+              @{menuItem.author.handle} blockieren
+            </button>
+            <button className="actionRow actionCancel" type="button" onClick={() => setMenuItem(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {report && (
+        <ReportDialog target={report} onClose={() => setReport(null)} onDone={(m) => toast(m)} />
+      )}
+
+      {showNotes && (
+        <NotificationsSheet
+          onClose={() => setShowNotes(false)}
+          onOpenProfile={openProfile}
+          onRead={() => setUnread(0)}
         />
       )}
 

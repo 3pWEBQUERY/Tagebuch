@@ -2,9 +2,10 @@
 
 import { memo } from "react";
 import { relativeTime } from "@/lib/format";
+import { photoUrl } from "@/lib/photo";
 import { moodOf, type FeedItem } from "@/lib/types";
 import { Avatar } from "./Avatar";
-import { IconComment, IconHeart } from "./icons";
+import { IconComment, IconHeart, IconMore } from "./icons";
 
 /**
  * Die Karte im Feed. Ein Tagebucheintrag hat kein Foto – den visuellen Platz
@@ -38,11 +39,13 @@ type Props = {
   onOpen: (item: FeedItem) => void;
   onAuthor: (handle: string) => void;
   onLike: (item: FeedItem) => void;
+  onMenu: (item: FeedItem) => void;
 };
 
-function PostCardBase({ item, onOpen, onAuthor, onLike }: Props) {
+function PostCardBase({ item, onOpen, onAuthor, onLike, onMenu }: Props) {
   const mood = moodOf(item.mood);
-  const { hero, title, text } = layout(item, mood !== null);
+  // Gibt es ein Bild, trägt es die Karte – die Stimmung wird zur Plakette darauf.
+  const { hero, title, text } = layout(item, mood !== null || item.photo !== null);
 
   return (
     <article className="post glass">
@@ -57,16 +60,46 @@ function PostCardBase({ item, onOpen, onAuthor, onLike }: Props) {
         <time className="postTime" dateTime={new Date(item.publishedAt).toISOString()}>
           {relativeTime(item.publishedAt)}
         </time>
+        {!item.mine && (
+          <button
+            className="iconBtn postMenu"
+            type="button"
+            aria-label="Mehr zu diesem Beitrag"
+            onClick={() => onMenu(item)}
+          >
+            <IconMore />
+          </button>
+        )}
       </header>
 
       <button
-        className={`postHero${mood ? "" : " postHeroQuiet"}`}
+        className={`postHero${item.photo ? " postHeroPhoto" : mood ? "" : " postHeroQuiet"}`}
         type="button"
         onClick={() => onOpen(item)}
         style={mood ? ({ ["--mood" as string]: mood.color } as React.CSSProperties) : undefined}
         aria-label="Eintrag öffnen"
       >
-        {mood ? (
+        {item.photo ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="postPhoto"
+              src={photoUrl(item.photo.id)}
+              alt=""
+              width={item.photo.width}
+              height={item.photo.height}
+              loading="lazy"
+              decoding="async"
+              style={{ aspectRatio: `${item.photo.width} / ${item.photo.height}` }}
+            />
+            {mood && (
+              <span className="moodBadge" title={mood.label}>
+                <span aria-hidden="true">{mood.face}</span>
+                <span className="sr-only">Stimmung: {mood.label}</span>
+              </span>
+            )}
+          </>
+        ) : mood ? (
           <>
             <span className="postFace">{mood.face}</span>
             <span className="postMood">{mood.label}</span>

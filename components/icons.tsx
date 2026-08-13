@@ -106,3 +106,31 @@ export const IconSend = (p: P) => (
     <path d="M7 12h13" />
   </svg>
 );
+
+export const IconCamera = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path d="M4.8 8.4h2.9l1.4-2.2h5.8l1.4 2.2h2.9a2 2 0 0 1 2 2v7.4a2 2 0 0 1-2 2H4.8a2 2 0 0 1-2-2v-7.4a2 2 0 0 1 2-2Z" />
+    <circle cx="12" cy="13.8" r="3.4" />
+  </svg>
+);
+
+export const IconBell = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path d="M18 9.5a6 6 0 0 0-12 0c0 4.4-1.6 6.1-1.6 6.1h15.2S18 13.9 18 9.5Z" />
+    <path d="M13.7 19.4a2 2 0 0 1-3.4 0" />
+  </svg>
+);
+
+export const IconMore = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <circle cx="5.5" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="18.5" cy="12" r="1.3" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+export const IconShield = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path d="M12 3.4 19 6v6c0 4.2-2.9 7.2-7 8.6-4.1-1.4-7-4.4-7-8.6V6l7-2.6Z" />
+  </svg>
+);

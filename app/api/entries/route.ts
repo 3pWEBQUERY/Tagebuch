@@ -27,7 +27,7 @@ const SELECT_CHANGED = `
   SELECT id,
          (EXTRACT(EPOCH FROM created_at) * 1000)::bigint AS created_at,
          (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint AS updated_at,
-         title, body, mood, tags, favorite, visibility,
+         title, body, mood, tags, favorite, visibility, photo_id,
          (EXTRACT(EPOCH FROM published_at) * 1000)::bigint AS published_at,
          (EXTRACT(EPOCH FROM deleted_at) * 1000)::bigint AS deleted_at
     FROM entries
@@ -40,9 +40,10 @@ const SELECT_CHANGED = `
    jüngere Fassung (updated_at). Deshalb das WHERE in beiden Upserts. */
 const UPSERT_ENTRY = `
   INSERT INTO entries (id, user_id, created_at, updated_at, title, body, mood, tags, favorite,
-                       visibility, published_at, deleted_at)
+                       visibility, published_at, photo_id, deleted_at)
   VALUES ($1, $9, to_timestamp($2 / 1000.0), to_timestamp($3 / 1000.0), $4, $5, $6, $7, $8,
-          $10, CASE WHEN $10 = 'public' THEN COALESCE(to_timestamp($11 / 1000.0), now()) END, NULL)
+          $10, CASE WHEN $10 = 'public' THEN COALESCE(to_timestamp($11 / 1000.0), now()) END,
+          $12, NULL)
   ON CONFLICT (id) DO UPDATE
      SET created_at = LEAST(entries.created_at, EXCLUDED.created_at),
          updated_at = EXCLUDED.updated_at,
@@ -52,6 +53,7 @@ const UPSERT_ENTRY = `
          tags       = EXCLUDED.tags,
          favorite   = EXCLUDED.favorite,
          visibility = EXCLUDED.visibility,
+         photo_id   = EXCLUDED.photo_id,
          -- Einmal veröffentlicht behält der Eintrag seinen Platz im Feed;
          -- eine spätere Korrektur schiebt ihn nicht wieder nach oben.
          published_at = CASE
@@ -95,6 +97,7 @@ type Row = {
   mood: number | null;
   tags: string[] | null;
   favorite: boolean;
+  photo_id: string | null;
   deleted_at: string | null;
 };
 
@@ -109,6 +112,7 @@ function toEntry(row: Row): Entry {
     mood: (row.mood as Entry["mood"]) ?? null,
     tags: row.tags ?? [],
     favorite: row.favorite,
+    photoId: row.photo_id,
     visibility: row.visibility === "public" ? "public" : "private",
     publishedAt: row.published_at === null ? null : Number(row.published_at),
   };
@@ -194,6 +198,7 @@ export async function POST(request: Request) {
           user.id,
           e.visibility,
           e.publishedAt,
+          e.photoId,
         ]);
       }
       for (const t of deletions) {

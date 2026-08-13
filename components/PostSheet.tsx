@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fullDate, relativeTime, time } from "@/lib/format";
+import { photoUrl } from "@/lib/photo";
 import * as social from "@/lib/social";
 import { moodOf, type Comment, type FeedItem } from "@/lib/types";
 import { Avatar } from "./Avatar";
@@ -137,7 +138,26 @@ export function PostSheet({
             </span>
           </button>
 
-          {mood && (
+          {post.photo && (
+            <div className="postHeroSheet postHeroPhoto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="postPhoto"
+                src={photoUrl(post.photo.id)}
+                alt=""
+                width={post.photo.width}
+                height={post.photo.height}
+                style={{ aspectRatio: `${post.photo.width} / ${post.photo.height}` }}
+              />
+              {mood && (
+                <span className="moodBadge" title={mood.label}>
+                  <span aria-hidden="true">{mood.face}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {mood && !post.photo && (
             <div
               className="postHero postHeroSheet"
               style={{ ["--mood" as string]: mood.color } as React.CSSProperties}

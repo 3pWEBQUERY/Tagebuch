@@ -1,6 +1,6 @@
 "use client";
 
-import type { Comment, FeedItem, Profile } from "./types";
+import type { AppNotification, Comment, FeedItem, Profile } from "./types";
 
 /** Alles Soziale spricht denselben Endpunktstil: JSON rein, JSON raus. */
 
@@ -80,4 +80,36 @@ export function fetchPeople(query?: string): Promise<{ profiles: Profile[]; sugg
   const params = new URLSearchParams();
   if (query) params.set("q", query);
   return request(`/api/people?${params}`);
+}
+
+/* ── Benachrichtigungen ────────────────────────────────────── */
+
+export function fetchNotifications(): Promise<{ items: AppNotification[]; unread: number }> {
+  return request("/api/notifications");
+}
+
+export function markNotificationsRead(): Promise<{ ok: boolean }> {
+  return request("/api/notifications", { method: "POST" });
+}
+
+/* ── Blockieren und Melden ─────────────────────────────────── */
+
+export function setBlock(handle: string, blocked: boolean): Promise<{ blocked: boolean }> {
+  return request(`/api/profiles/${encodeURIComponent(handle)}/block`, {
+    method: blocked ? "POST" : "DELETE",
+  });
+}
+
+export function fetchBlocked(): Promise<{ blocked: { handle: string; displayName: string }[] }> {
+  return request("/api/blocks");
+}
+
+export function reportContent(payload: {
+  handle?: string;
+  entryId?: string;
+  commentId?: string;
+  reason: string;
+  note?: string;
+}): Promise<{ reported: boolean }> {
+  return request("/api/reports", { method: "POST", body: JSON.stringify(payload) });
 }

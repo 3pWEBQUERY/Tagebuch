@@ -70,6 +70,53 @@ const SCHEMA = `
     PRIMARY KEY (entry_id, user_id)
   );
 
+  -- Bilder liegen in der Datenbank statt in einem Objektspeicher: eine
+  -- Abhängigkeit weniger, und bei einem Tagebuch geht es um wenige Fotos je
+  -- Person. Die Größe wird schon im Browser auf ~1600px gerechnet.
+  CREATE TABLE IF NOT EXISTS photos (
+    id         text        PRIMARY KEY,
+    user_id    text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    mime       text        NOT NULL,
+    width      integer     NOT NULL,
+    height     integer     NOT NULL,
+    bytes      bytea       NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  ALTER TABLE entries ADD COLUMN IF NOT EXISTS photo_id text;
+
+  -- Wer blockiert, verschwindet in beide Richtungen: keine Beiträge, keine
+  -- Kommentare, kein Profil, keine Benachrichtigungen.
+  CREATE TABLE IF NOT EXISTS blocks (
+    blocker_id text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (blocker_id, blocked_id),
+    CONSTRAINT blocks_not_self CHECK (blocker_id <> blocked_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS reports (
+    id             text        PRIMARY KEY,
+    reporter_id    text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_user_id text,
+    entry_id       text,
+    comment_id     text,
+    reason         text        NOT NULL,
+    note           text        NOT NULL DEFAULT '',
+    created_at     timestamptz NOT NULL DEFAULT now()
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id         text        PRIMARY KEY,
+    user_id    text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    actor_id   text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind       text        NOT NULL,
+    entry_id   text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    read_at    timestamptz
+  );
+  CREATE INDEX IF NOT EXISTS notifications_user_idx
+    ON notifications (user_id, created_at DESC);
+
   CREATE TABLE IF NOT EXISTS comments (
     id         text        PRIMARY KEY,
     entry_id   text        NOT NULL REFERENCES entries(id) ON DELETE CASCADE,

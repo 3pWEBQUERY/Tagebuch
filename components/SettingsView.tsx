@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { stamp } from "@/lib/format";
 import type { InstallState } from "@/lib/install";
 import { useStore, type SyncStatus } from "@/lib/store";
 import { ACCENTS, normalizeEntry, type Entry, type ThemePref } from "@/lib/types";
+import * as social from "@/lib/social";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconBack } from "./icons";
 
@@ -43,6 +44,32 @@ export function SettingsView({ install, onBack }: { install: InstallState; onBac
   const [askWipe, setAskWipe] = useState(false);
   const [askSignOut, setAskSignOut] = useState(false);
   const [askDeleteAccount, setAskDeleteAccount] = useState(false);
+  const [blocked, setBlocked] = useState<{ handle: string; displayName: string }[]>([]);
+
+  /* Blockierte Profile laden – ohne diese Liste ließe sich eine Blockade
+     nicht mehr zurücknehmen, denn das Profil ist ja unsichtbar. */
+  useEffect(() => {
+    let alive = true;
+    social
+      .fetchBlocked()
+      .then(({ blocked: list }) => {
+        if (alive) setBlocked(list);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function unblock(handle: string) {
+    try {
+      await social.setBlock(handle, false);
+      setBlocked((list) => list.filter((b) => b.handle !== handle));
+      toast(`@${handle} ist wieder sichtbar`);
+    } catch {
+      toast("Das hat nicht geklappt");
+    }
+  }
 
   const themeIndex = THEMES.findIndex((t) => t.id === theme);
 
@@ -234,6 +261,26 @@ export function SettingsView({ install, onBack }: { install: InstallState; onBac
               Konto löschen
             </button>
           </div>
+        </section>
+
+        <section className="card glass" aria-labelledby="block-h">
+          <div className="cardHead">
+            <h2 className="cardTitle" id="block-h">
+              Blockiert
+            </h2>
+            <span className="cardMeta">{blocked.length === 0 ? "niemand" : blocked.length}</span>
+          </div>
+          <p className="cardText" style={{ marginBottom: blocked.length ? 4 : 0 }}>
+            Blockierte Profile sehen dich nicht mehr und du sie nicht – in beide Richtungen.
+          </p>
+          {blocked.map((b) => (
+            <div className="blockRow" key={b.handle}>
+              <span className="blockName">@{b.handle}</span>
+              <button className="btn" type="button" onClick={() => void unblock(b.handle)}>
+                Wieder zulassen
+              </button>
+            </div>
+          ))}
         </section>
 
         <section className="card glass" aria-labelledby="app-h">

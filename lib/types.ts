@@ -12,6 +12,8 @@ export type Entry = {
   mood: MoodValue | null;
   tags: string[];
   favorite: boolean;
+  /** Optionales Bild, im Browser verkleinert und in der Datenbank abgelegt. */
+  photoId: string | null;
   visibility: Visibility;
   /** Zeitpunkt der ersten Veröffentlichung – im Feed die Sortiergröße. */
   publishedAt: number | null;
@@ -40,9 +42,12 @@ export type FeedAuthor = {
   displayName: string;
 };
 
+export type Photo = { id: string; width: number; height: number };
+
 export type FeedItem = {
   id: string;
   author: FeedAuthor;
+  photo: Photo | null;
   publishedAt: number;
   createdAt: number;
   title: string;
@@ -54,6 +59,26 @@ export type FeedItem = {
   liked: boolean;
   mine: boolean;
 };
+
+export type NotificationKind = "like" | "comment" | "follow";
+
+export type AppNotification = {
+  id: string;
+  kind: NotificationKind;
+  actor: FeedAuthor;
+  entryId: string | null;
+  entryTitle: string | null;
+  createdAt: number;
+  read: boolean;
+};
+
+export const REPORT_REASONS = [
+  { id: "hass", label: "Hass oder Beleidigung" },
+  { id: "belaestigung", label: "Belästigung" },
+  { id: "selbstgefaehrdung", label: "Sorge um die Person" },
+  { id: "spam", label: "Spam oder Werbung" },
+  { id: "sonstiges", label: "Etwas anderes" },
+] as const;
 
 export type Comment = {
   id: string;
@@ -124,6 +149,7 @@ export function normalizeEntry(raw: unknown): Entry | null {
     mood,
     tags: e.tags.filter((t): t is string => typeof t === "string").slice(0, 24),
     favorite: e.favorite === true,
+    photoId: typeof e.photoId === "string" ? e.photoId : null,
     visibility,
     publishedAt:
       visibility === "public" && typeof e.publishedAt === "number" ? e.publishedAt : null,

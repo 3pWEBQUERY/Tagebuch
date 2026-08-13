@@ -2295,3 +2295,308 @@ mark {
 .entryPublic svg {
   stroke-width: 1.9;
 }
+
+/* ============================================================
+   13 Fotos, Benachrichtigungen, Melden & Blockieren
+   ============================================================ */
+
+/* ── Bild im Editor ───────────────────────────────────────── */
+.photoAdd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 54px;
+  border-radius: var(--r-s);
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1.5px var(--hairline);
+  color: var(--text-2);
+  font-size: 14.5px;
+  font-weight: 570;
+  transition: background 0.2s, color 0.2s;
+}
+.photoAdd svg {
+  width: 20px;
+  height: 20px;
+}
+.photoAdd:hover {
+  background: var(--fill-2);
+  color: var(--text);
+}
+.photoAdd:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.photoPreview {
+  position: relative;
+  border-radius: var(--r-s);
+  overflow: hidden;
+  background: var(--fill);
+  line-height: 0;
+}
+.photoPreview img {
+  width: 100%;
+  height: auto;
+  max-height: 44vh;
+  object-fit: cover;
+}
+.photoRemove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  background: rgba(10, 14, 24, 0.55);
+  backdrop-filter: blur(10px);
+  color: #fff;
+}
+.photoRemove:hover {
+  background: rgba(10, 14, 24, 0.75);
+}
+.photoRemove svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.4;
+}
+.photoBusy {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  background: rgba(10, 14, 24, 0.6);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.3;
+}
+
+/* ── Bild in Karte und Beitrag ────────────────────────────── */
+.postHeroPhoto {
+  position: relative;
+  display: block;
+  padding: 0;
+  min-height: 0;
+  background: var(--fill);
+  overflow: hidden;
+}
+.postPhoto {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 62vh;
+  object-fit: cover;
+}
+.postHeroSheet.postHeroPhoto {
+  border-radius: var(--r-m);
+}
+/* Die Stimmung wird zur Plakette, sobald ein Bild die Fläche trägt. */
+.moodBadge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 19px;
+  line-height: 1;
+  background: rgba(10, 14, 24, 0.45);
+  backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+.postMenu {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  color: var(--text-3);
+}
+.postMenu svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ── Glocke ───────────────────────────────────────────────── */
+.topbarBell {
+  position: relative;
+  flex: none;
+}
+.bellDot {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* ── Benachrichtigungen ───────────────────────────────────── */
+.note {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--r-m);
+  margin-inline: -12px;
+}
+.noteUnread {
+  background: color-mix(in oklab, var(--accent) 9%, transparent);
+}
+.noteAvatar {
+  position: relative;
+  border-radius: 50%;
+}
+.noteKind {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 0 0 0 1.5px var(--bg);
+  color: var(--text-2);
+}
+.noteKind svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.2;
+}
+.noteKind--like {
+  color: var(--danger);
+}
+.noteKind--follow {
+  color: var(--accent);
+}
+.noteText {
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.noteText b {
+  color: var(--text);
+  font-weight: 630;
+}
+.noteQuote {
+  color: var(--text-3);
+}
+.noteTime {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+/* ── Aktionsblatt ─────────────────────────────────────────── */
+.actionSheet {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  background: rgba(8, 11, 20, 0.4);
+  backdrop-filter: blur(6px);
+  animation: bd 0.25s var(--ease);
+}
+.actionCard {
+  width: min(400px, 100%);
+  padding: 8px;
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-l);
+  animation: toast-in 0.32s var(--spring);
+}
+.actionTitle {
+  padding: 10px 12px 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-align: center;
+}
+.actionRow {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--r-m);
+  font-size: 15.5px;
+  font-weight: 570;
+  text-align: center;
+  transition: background 0.18s;
+}
+.actionRow:hover {
+  background: var(--fill);
+}
+.actionRowDanger {
+  color: var(--danger);
+}
+.actionCancel {
+  margin-top: 4px;
+  background: var(--fill);
+  font-weight: 620;
+}
+
+/* ── Melden ───────────────────────────────────────────────── */
+.reportDialog {
+  width: min(420px, calc(100% - 32px));
+  text-align: left;
+}
+.reportDialog .confirmTitle,
+.reportDialog .confirmText {
+  text-align: left;
+}
+.reasons {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.reason {
+  padding: 11px 14px;
+  border-radius: var(--r-s);
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1.5px transparent;
+  font-size: 14.5px;
+  font-weight: 560;
+  text-align: left;
+  transition: background 0.18s, box-shadow 0.18s;
+}
+.reason:hover {
+  background: var(--fill-2);
+}
+.reason[aria-checked="true"] {
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--accent) 55%, transparent);
+  color: color-mix(in oklab, var(--accent) 80%, var(--text));
+}
+.reportNote {
+  margin-bottom: 16px;
+}
+
+/* Blockliste in den Einstellungen */
+.blockRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+}
+.blockName {
+  font-size: 14.5px;
+  font-weight: 560;
+}

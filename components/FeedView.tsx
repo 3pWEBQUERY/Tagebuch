@@ -12,10 +12,12 @@ type Scope = social.FeedScope;
 export function FeedView({
   onOpenPost,
   onOpenProfile,
+  onMenu,
   refreshToken,
 }: {
   onOpenPost: (item: FeedItem) => void;
   onOpenProfile: (handle: string) => void;
+  onMenu: (item: FeedItem) => void;
   /** Ändert sich, wenn anderswo etwas veröffentlicht wurde – dann neu laden. */
   refreshToken: number;
 }) {
@@ -182,6 +184,7 @@ export function FeedView({
                   onOpen={onOpenPost}
                   onAuthor={onOpenProfile}
                   onLike={(i) => void toggleLike(i)}
+                  onMenu={onMenu}
                 />
               ))}
             </div>

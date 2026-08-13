@@ -19,6 +19,8 @@ export function ProfileView({
   onOpenPost,
   onOpenProfile,
   onOpenSettings,
+  onMenu,
+  onReport,
   refreshToken,
 }: {
   /** null = eigenes Profil */
@@ -27,6 +29,8 @@ export function ProfileView({
   onOpenPost: (item: FeedItem) => void;
   onOpenProfile: (handle: string) => void;
   onOpenSettings: () => void;
+  onMenu: (item: FeedItem) => void;
+  onReport: (handle: string) => void;
   refreshToken: number;
 }) {
   const { session, setProfile, toast } = useStore();
@@ -62,6 +66,17 @@ export function ProfileView({
       alive = false;
     };
   }, [target, refreshToken]);
+
+  async function block() {
+    if (!profile) return;
+    try {
+      await social.setBlock(profile.handle, true);
+      toast(`@${profile.handle} ist blockiert`);
+      onBack?.();
+    } catch {
+      toast("Blockieren hat nicht geklappt");
+    }
+  }
 
   async function toggleFollow() {
     if (!profile) return;
@@ -168,13 +183,25 @@ export function ProfileView({
                     </button>
                   </>
                 ) : (
-                  <button
-                    className={`btn ${profile.following ? "" : "btnPrimary"}`}
-                    type="button"
-                    onClick={() => void toggleFollow()}
-                  >
-                    {profile.following ? "Folgst du" : "Folgen"}
-                  </button>
+                  <>
+                    <button
+                      className={`btn ${profile.following ? "" : "btnPrimary"}`}
+                      type="button"
+                      onClick={() => void toggleFollow()}
+                    >
+                      {profile.following ? "Folgst du" : "Folgen"}
+                    </button>
+                    <button className="btn" type="button" onClick={() => onReport(profile.handle)}>
+                      Melden
+                    </button>
+                    <button
+                      className="btn btnDanger"
+                      type="button"
+                      onClick={() => void block()}
+                    >
+                      Blockieren
+                    </button>
+                  </>
                 )}
               </div>
             </header>
@@ -213,6 +240,7 @@ export function ProfileView({
                   onOpen={onOpenPost}
                   onAuthor={onOpenProfile}
                   onLike={(i) => void toggleLike(i)}
+                  onMenu={onMenu}
                 />
               ))}
             </div>

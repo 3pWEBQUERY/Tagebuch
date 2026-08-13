@@ -3,7 +3,7 @@
 
 /* Version bei jeder Auslieferung hochzählen – alte Caches werden beim
    Aktivieren entfernt, sonst hält eine installierte App die alte Oberfläche fest. */
-const VERSION = "tagebuch-v2";
+const VERSION = "tagebuch-v3";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 
@@ -54,6 +54,13 @@ self.addEventListener("fetch", (event) => {
         }
       })(),
     );
+    return;
+  }
+
+  // API-Antworten gehören nicht in den Cache – ein zwischengespeicherter
+  // Anmeldestatus oder Feed führt zu falschen Anzeigen. Bilder sind die
+  // Ausnahme: sie sind unveränderlich und offline wertvoll.
+  if (url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/photos/")) {
     return;
   }
 

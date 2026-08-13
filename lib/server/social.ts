@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { getPool } from "./db";
-import type { Comment, FeedItem, MoodValue, Profile } from "../types";
+import type { AppNotification, Comment, FeedItem, MoodValue, NotificationKind, Profile } from "../types";
 
 /**
  * Alles Öffentliche der App: Profile, Feed, Folgen, Herzen, Kommentare.
@@ -14,6 +14,19 @@ import type { Comment, FeedItem, MoodValue, Profile } from "../types";
  */
 
 const PUBLIC = "e.visibility = 'public' AND e.deleted_at IS NULL";
+
+/**
+ * Blockaden wirken in beide Richtungen: wer blockiert, sieht nichts mehr von
+ * der Person – und wird von ihr auch nicht mehr gesehen. Ein einseitiges
+ * Ausblenden würde die Blockade wertlos machen.
+ */
+function notBlocked(viewerParam: string, authorColumn: string): string {
+  return `NOT EXISTS (
+    SELECT 1 FROM blocks b
+     WHERE (b.blocker_id = ${viewerParam} AND b.blocked_id = ${authorColumn})
+        OR (b.blocker_id = ${authorColumn} AND b.blocked_id = ${viewerParam})
+  )`;
+}
 
 /* ── Handles ───────────────────────────────────────────────── */
 
@@ -108,7 +121,7 @@ function toProfile(row: ProfileRow, viewerId: string): Profile {
 
 export async function profileByHandle(handle: string, viewerId: string): Promise<Profile | null> {
   const { rows } = await getPool().query<ProfileRow>(
-    `${PROFILE_SELECT} WHERE lower(u.handle) = lower($1)`,
+    `${PROFILE_SELECT} WHERE lower(u.handle) = lower($1) AND ${notBlocked("$2", "u.id")}`,
     [handle, viewerId],
   );
   return rows[0] ? toProfile(rows[0], viewerId) : null;
@@ -159,6 +172,7 @@ export async function suggestedProfiles(viewerId: string, limit = 12): Promise<P
     `${PROFILE_SELECT}
       WHERE u.id <> $2
         AND u.handle IS NOT NULL
+        AND ${notBlocked("$2", "u.id")}
         AND NOT EXISTS(SELECT 1 FROM follows f WHERE f.followee_id = u.id AND f.follower_id = $2)
       ORDER BY (SELECT count(*) FROM entries e WHERE e.user_id = u.id AND ${PUBLIC}) DESC,
                u.created_at DESC
@@ -173,6 +187,7 @@ export async function searchProfiles(query: string, viewerId: string, limit = 20
   const { rows } = await getPool().query<ProfileRow>(
     `${PROFILE_SELECT}
       WHERE u.handle IS NOT NULL
+        AND ${notBlocked("$2", "u.id")}
         AND (lower(u.handle) LIKE $1 OR lower(coalesce(u.display_name, '')) LIKE $1)
       ORDER BY u.handle
       LIMIT $3`,
@@ -185,6 +200,9 @@ export async function searchProfiles(query: string, viewerId: string, limit = 20
 
 type FeedRow = {
   id: string;
+  photo_id: string | null;
+  photo_width: number | null;
+  photo_height: number | null;
   title: string | null;
   body: string | null;
   mood: number | null;
@@ -204,13 +222,16 @@ const FEED_SELECT = `
          (EXTRACT(EPOCH FROM e.published_at) * 1000)::bigint AS published_at,
          (EXTRACT(EPOCH FROM e.created_at) * 1000)::bigint   AS created_at,
          u.id AS author_id, u.handle, u.display_name,
+         e.photo_id, p.width AS photo_width, p.height AS photo_height,
          (SELECT count(*) FROM likes l WHERE l.entry_id = e.id)      AS like_count,
          (SELECT count(*) FROM comments c WHERE c.entry_id = e.id)   AS comment_count,
          EXISTS(SELECT 1 FROM likes l WHERE l.entry_id = e.id AND l.user_id = $1) AS liked
     FROM entries e
     JOIN users u ON u.id = e.user_id
+    LEFT JOIN photos p ON p.id = e.photo_id
    WHERE ${PUBLIC}
      AND e.published_at IS NOT NULL
+     AND ${notBlocked("$1", "e.user_id")}
 `;
 
 function toFeedItem(row: FeedRow, viewerId: string): FeedItem {
@@ -221,6 +242,10 @@ function toFeedItem(row: FeedRow, viewerId: string): FeedItem {
       handle: row.handle,
       displayName: row.display_name || row.handle,
     },
+    photo:
+      row.photo_id && row.photo_width && row.photo_height
+        ? { id: row.photo_id, width: row.photo_width, height: row.photo_height }
+        : null,
     publishedAt: Number(row.published_at),
     createdAt: Number(row.created_at),
     title: row.title ?? "",
@@ -297,6 +322,7 @@ export async function setFollow(
        ON CONFLICT DO NOTHING`,
       [followerId, followee.id],
     );
+    await notify({ recipientId: followee.id, actorId: followerId, kind: "follow" });
   } else {
     await getPool().query("DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2", [
       followerId,
@@ -306,6 +332,20 @@ export async function setFollow(
   return profileById(followee.id, followerId);
 }
 
+/**
+ * Darf diese Person diesen Eintrag überhaupt sehen? Öffentlich reicht nicht –
+ * über eine Blockade hinweg gibt es keinen Zugriff, auch nicht schreibend.
+ * Sonst könnte eine blockierte Person weiter Herzen und Kommentare hinterlassen.
+ */
+async function entryVisibleTo(entryId: string, viewerId: string): Promise<boolean> {
+  const { rowCount } = await getPool().query(
+    `SELECT 1 FROM entries e
+      WHERE e.id = $1 AND ${PUBLIC} AND ${notBlocked("$2", "e.user_id")}`,
+    [entryId, viewerId],
+  );
+  return Boolean(rowCount);
+}
+
 /* ── Herzen ────────────────────────────────────────────────── */
 
 export async function setLike(
@@ -313,19 +353,22 @@ export async function setLike(
   entryId: string,
   liked: boolean,
 ): Promise<{ likeCount: number; liked: boolean } | null> {
-  // Nur öffentliche Einträge lassen sich mögen – sonst könnte man über die
-  // Antwort die Existenz privater Einträge abfragen.
-  const { rowCount } = await getPool().query(
-    `SELECT 1 FROM entries e WHERE e.id = $1 AND ${PUBLIC}`,
-    [entryId],
-  );
-  if (!rowCount) return null;
+  // Nur öffentliche, nicht blockierte Einträge lassen sich mögen – sonst
+  // ließe sich über die Antwort die Existenz privater Einträge abfragen.
+  if (!(await entryVisibleTo(entryId, userId))) return null;
 
   if (liked) {
     await getPool().query(
       "INSERT INTO likes (entry_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
       [entryId, userId],
     );
+    const { rows: owner } = await getPool().query<{ user_id: string }>(
+      "SELECT user_id FROM entries WHERE id = $1",
+      [entryId],
+    );
+    if (owner[0]) {
+      await notify({ recipientId: owner[0].user_id, actorId: userId, kind: "like", entryId });
+    }
   } else {
     await getPool().query("DELETE FROM likes WHERE entry_id = $1 AND user_id = $2", [
       entryId,
@@ -365,11 +408,7 @@ function toComment(row: CommentRow, viewerId: string): Comment {
 }
 
 export async function readComments(entryId: string, viewerId: string): Promise<Comment[] | null> {
-  const { rowCount } = await getPool().query(
-    `SELECT 1 FROM entries e WHERE e.id = $1 AND ${PUBLIC}`,
-    [entryId],
-  );
-  if (!rowCount) return null;
+  if (!(await entryVisibleTo(entryId, viewerId))) return null;
 
   const { rows } = await getPool().query<CommentRow>(
     `SELECT c.id, c.body,
@@ -378,8 +417,9 @@ export async function readComments(entryId: string, viewerId: string): Promise<C
        FROM comments c
        JOIN users u ON u.id = c.user_id
       WHERE c.entry_id = $1
+        AND ${notBlocked("$2", "c.user_id")}
       ORDER BY c.created_at`,
-    [entryId],
+    [entryId, viewerId],
   );
   return rows.map((row) => toComment(row, viewerId));
 }
@@ -391,11 +431,7 @@ export async function writeComment(
 ): Promise<Comment | null> {
   const text = body.trim().slice(0, 1000);
   if (!text) return null;
-  const { rowCount } = await getPool().query(
-    `SELECT 1 FROM entries e WHERE e.id = $1 AND ${PUBLIC}`,
-    [entryId],
-  );
-  if (!rowCount) return null;
+  if (!(await entryVisibleTo(entryId, userId))) return null;
 
   const id = randomUUID();
   await getPool().query("INSERT INTO comments (id, entry_id, user_id, body) VALUES ($1, $2, $3, $4)", [
@@ -404,6 +440,13 @@ export async function writeComment(
     userId,
     text,
   ]);
+  const { rows: owner } = await getPool().query<{ user_id: string }>(
+    "SELECT user_id FROM entries WHERE id = $1",
+    [entryId],
+  );
+  if (owner[0]) {
+    await notify({ recipientId: owner[0].user_id, actorId: userId, kind: "comment", entryId });
+  }
   const { rows } = await getPool().query<CommentRow>(
     `SELECT c.id, c.body,
             (EXTRACT(EPOCH FROM c.created_at) * 1000)::bigint AS created_at,
@@ -426,4 +469,196 @@ export async function deleteComment(userId: string, commentId: string): Promise<
     [commentId, userId],
   );
   return Boolean(rowCount);
+}
+
+/* ── Benachrichtigungen ────────────────────────────────────── */
+
+/**
+ * Wird bei Herz, Kommentar und Folgen geschrieben – nie für eigene Handlungen
+ * und nie über eine Blockade hinweg. Doppelte Herzen erzeugen keine zweite
+ * Nachricht: ein Klick hin und her würde sonst die Liste fluten.
+ */
+async function notify(options: {
+  recipientId: string;
+  actorId: string;
+  kind: NotificationKind;
+  entryId?: string | null;
+}): Promise<void> {
+  const { recipientId, actorId, kind, entryId = null } = options;
+  if (recipientId === actorId) return;
+
+  const { rowCount: blocked } = await getPool().query(
+    `SELECT 1 FROM blocks
+      WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)`,
+    [recipientId, actorId],
+  );
+  if (blocked) return;
+
+  if (kind !== "comment") {
+    const { rowCount: exists } = await getPool().query(
+      `SELECT 1 FROM notifications
+        WHERE user_id = $1 AND actor_id = $2 AND kind = $3
+          AND entry_id IS NOT DISTINCT FROM $4`,
+      [recipientId, actorId, kind, entryId],
+    );
+    if (exists) return;
+  }
+
+  await getPool().query(
+    "INSERT INTO notifications (id, user_id, actor_id, kind, entry_id) VALUES ($1, $2, $3, $4, $5)",
+    [randomUUID(), recipientId, actorId, kind, entryId],
+  );
+}
+
+type NotificationRow = {
+  id: string;
+  kind: NotificationKind;
+  entry_id: string | null;
+  entry_title: string | null;
+  entry_body: string | null;
+  created_at: string;
+  read_at: string | null;
+  actor_id: string;
+  handle: string;
+  display_name: string | null;
+};
+
+export async function readNotifications(
+  userId: string,
+  limit = 40,
+): Promise<{ items: AppNotification[]; unread: number }> {
+  const { rows } = await getPool().query<NotificationRow>(
+    `SELECT n.id, n.kind, n.entry_id,
+            e.title AS entry_title, e.body AS entry_body,
+            (EXTRACT(EPOCH FROM n.created_at) * 1000)::bigint AS created_at,
+            n.read_at, u.id AS actor_id, u.handle, u.display_name
+       FROM notifications n
+       JOIN users u ON u.id = n.actor_id
+       LEFT JOIN entries e ON e.id = n.entry_id
+      WHERE n.user_id = $1
+        AND ${notBlocked("$1", "n.actor_id")}
+      ORDER BY n.created_at DESC
+      LIMIT $2`,
+    [userId, limit],
+  );
+
+  const items = rows.map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    actor: {
+      id: row.actor_id,
+      handle: row.handle,
+      displayName: row.display_name || row.handle,
+    },
+    entryId: row.entry_id,
+    entryTitle: (row.entry_title || row.entry_body || "").trim().slice(0, 60) || null,
+    createdAt: Number(row.created_at),
+    read: row.read_at !== null,
+  }));
+  return { items, unread: items.filter((i) => !i.read).length };
+}
+
+export async function markNotificationsRead(userId: string): Promise<void> {
+  await getPool().query(
+    "UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL",
+    [userId],
+  );
+}
+
+/* ── Blockieren ────────────────────────────────────────────── */
+
+/**
+ * Blockieren löst bestehende Verbindungen in beide Richtungen: sonst bliebe
+ * die Person weiter Follower und bekäme jede neue Veröffentlichung.
+ */
+export async function setBlock(
+  userId: string,
+  handle: string,
+  blocked: boolean,
+): Promise<{ blocked: boolean } | null> {
+  const { rows } = await getPool().query<{ id: string }>(
+    "SELECT id FROM users WHERE lower(handle) = lower($1)",
+    [handle],
+  );
+  const target = rows[0];
+  if (!target || target.id === userId) return null;
+
+  if (blocked) {
+    const client = await getPool().connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [userId, target.id],
+      );
+      await client.query(
+        `DELETE FROM follows
+          WHERE (follower_id = $1 AND followee_id = $2)
+             OR (follower_id = $2 AND followee_id = $1)`,
+        [userId, target.id],
+      );
+      await client.query(
+        `DELETE FROM notifications
+          WHERE (user_id = $1 AND actor_id = $2) OR (user_id = $2 AND actor_id = $1)`,
+        [userId, target.id],
+      );
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  } else {
+    await getPool().query("DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2", [
+      userId,
+      target.id,
+    ]);
+  }
+  return { blocked };
+}
+
+export async function blockedProfiles(userId: string): Promise<{ handle: string; displayName: string }[]> {
+  const { rows } = await getPool().query<{ handle: string; display_name: string | null }>(
+    `SELECT u.handle, u.display_name
+       FROM blocks b JOIN users u ON u.id = b.blocked_id
+      WHERE b.blocker_id = $1
+      ORDER BY u.handle`,
+    [userId],
+  );
+  return rows.map((r) => ({ handle: r.handle, displayName: r.display_name || r.handle }));
+}
+
+/* ── Melden ────────────────────────────────────────────────── */
+
+/**
+ * Meldungen landen in der Datenbank, damit sie nachlesbar sind. Automatisch
+ * gelöscht wird nichts – wer meldet, soll blockieren können, ohne auf eine
+ * Entscheidung zu warten.
+ */
+export async function createReport(options: {
+  reporterId: string;
+  handle?: string | null;
+  entryId?: string | null;
+  commentId?: string | null;
+  reason: string;
+  note?: string;
+}): Promise<boolean> {
+  const { reporterId, handle, entryId = null, commentId = null, reason, note = "" } = options;
+  let targetUserId: string | null = null;
+  if (handle) {
+    const { rows } = await getPool().query<{ id: string }>(
+      "SELECT id FROM users WHERE lower(handle) = lower($1)",
+      [handle],
+    );
+    targetUserId = rows[0]?.id ?? null;
+  }
+  if (!targetUserId && !entryId && !commentId) return false;
+
+  await getPool().query(
+    `INSERT INTO reports (id, reporter_id, target_user_id, entry_id, comment_id, reason, note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [randomUUID(), reporterId, targetUserId, entryId, commentId, reason.slice(0, 40), note.slice(0, 1000)],
+  );
+  return true;
 }
