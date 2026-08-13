@@ -9,6 +9,13 @@ import { Pool } from "pg";
  * sonst käme es beim nächsten Abgleich von einem anderen Gerät zurück.
  */
 const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS users (
+    id            text        PRIMARY KEY,
+    email         text        NOT NULL UNIQUE,
+    password_hash text        NOT NULL,
+    created_at    timestamptz NOT NULL DEFAULT now()
+  );
+
   CREATE TABLE IF NOT EXISTS entries (
     id          text        PRIMARY KEY,
     created_at  timestamptz NOT NULL,
@@ -21,7 +28,14 @@ const SCHEMA = `
     deleted_at  timestamptz,
     CONSTRAINT entries_mood_range CHECK (mood IS NULL OR (mood BETWEEN 1 AND 5))
   );
+  -- Einträge gehören ab jetzt einem Konto. Bewusst nachträglich und ohne
+  -- NOT NULL: eine bestehende Tabelle soll sich fügen, statt beim Start zu
+  -- brechen. Zeilen ohne Konto sind für keine Abfrage sichtbar und laufen
+  -- über das Grabstein-Aufräumen aus.
+  ALTER TABLE entries ADD COLUMN IF NOT EXISTS user_id text;
+
   CREATE INDEX IF NOT EXISTS entries_updated_at_idx ON entries (updated_at);
+  CREATE INDEX IF NOT EXISTS entries_user_updated_idx ON entries (user_id, updated_at);
 `;
 
 /**

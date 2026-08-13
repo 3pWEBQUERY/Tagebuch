@@ -11,17 +11,18 @@ import {
   type ReactNode,
 } from "react";
 import * as db from "./db";
+import { logout as endSession, readSession, type SessionUser } from "./auth";
 import {
+  adoptUser,
+  clearLocalData,
   forceFullPush,
+  hasPendingChanges,
   lastSyncedAt,
-  lockAgain,
-  readSession,
   recordDeletion,
   SyncDisabled,
   SyncLocked,
   SyncOffline,
   syncEntries,
-  type SessionState,
 } from "./sync";
 import { ACCENTS, type Entry, type ThemePref } from "./types";
 
@@ -42,7 +43,11 @@ export type SyncState = {
   error: string | null;
 };
 
-export type Session = SessionState & { checked: boolean };
+export type Session = {
+  user: SessionUser | null;
+  signupCodeRequired: boolean;
+  checked: boolean;
+};
 
 type Store = {
   entries: Entry[];
@@ -50,8 +55,8 @@ type Store = {
   sync: SyncState;
   syncNow: () => Promise<void>;
   session: Session;
-  markUnlocked: () => void;
-  lockDevice: () => Promise<void>;
+  signIn: (user: SessionUser) => Promise<void>;
+  signOut: (options?: { force?: boolean }) => Promise<"ok" | "unsynced">;
   save: (entry: Entry) => Promise<void>;
   remove: (id: string, options?: { undo?: boolean }) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -98,8 +103,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [sync, setSync] = useState<SyncState>({ status: "idle", lastSyncedAt: null, error: null });
   const [session, setSession] = useState<Session>({
-    required: false,
-    authenticated: true,
+    user: null,
+    signupCodeRequired: false,
     checked: false,
   });
   const toastId = useRef(0);
@@ -130,10 +135,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  /* Verlangt der Server eine Passphrase? Ohne Antwort bleibt die App bedienbar. */
+  /* Wer ist angemeldet? Wechselt das Konto, muss die lokale Kopie weg,
+     bevor irgendetwas hochgeladen wird. */
   useEffect(() => {
     readSession()
-      .then((state) => setSession({ ...state, checked: true }))
+      .then(async (state) => {
+        if (state.user) {
+          const switched = await adoptUser(state.user.id);
+          if (switched) setEntries([]);
+        }
+        setSession({ ...state, checked: true });
+      })
       .catch(() => setSession((s) => ({ ...s, checked: true })));
   }, []);
 
@@ -159,7 +171,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (err instanceof SyncOffline) {
         setSync((s) => ({ ...s, status: "offline", error: null }));
       } else if (err instanceof SyncLocked) {
-        setSession((s) => ({ ...s, required: true, authenticated: false, checked: true }));
+        setSession((s) => ({ ...s, user: null, checked: true }));
         setSync((s) => ({ ...s, status: "locked", error: null }));
       } else if (err instanceof SyncDisabled) {
         setSync((s) => ({ ...s, status: "disabled", error: err.message }));
@@ -175,16 +187,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const markUnlocked = useCallback(() => {
-    setSession({ required: true, authenticated: true, checked: true });
-    void runSync();
-  }, [runSync]);
+  const signIn = useCallback(
+    async (user: SessionUser) => {
+      // Frisch angemeldet: gehört die lokale Kopie jemand anderem, fliegt sie raus.
+      const switched = await adoptUser(user.id);
+      if (switched) setEntries([]);
+      setSession((s) => ({ ...s, user, checked: true }));
+      void runSync();
+    },
+    [runSync],
+  );
 
-  const lockDevice = useCallback(async () => {
-    await lockAgain();
-    setSession((s) => ({ ...s, authenticated: false }));
-    setSync({ status: "locked", lastSyncedAt: null, error: null });
-  }, []);
+  const signOut = useCallback(
+    async (options?: { force?: boolean }) => {
+      // Abmelden räumt das Gerät leer. Was hier noch nicht hochgeladen ist,
+      // wäre danach weg – deshalb erst ein letzter Abgleich und, wenn der
+      // scheitert, eine ehrliche Rückfrage statt stiller Löschung.
+      await runSync().catch(() => undefined);
+      if (!options?.force && (await hasPendingChanges(entriesRef.current))) {
+        return "unsynced";
+      }
+      await endSession();
+      await clearLocalData();
+      setEntries([]);
+      setSession((s) => ({ ...s, user: null, checked: true }));
+      setSync({ status: "locked", lastSyncedAt: null, error: null });
+      return "ok";
+    },
+    [runSync],
+  );
 
   /** Nach Änderungen kurz warten – Tippen soll nicht jeden Anschlag hochladen. */
   const scheduleSync = useCallback(() => {
@@ -324,8 +355,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sync,
       syncNow: runSync,
       session,
-      markUnlocked,
-      lockDevice,
+      signIn,
+      signOut,
       save,
       remove,
       toggleFavorite,
@@ -345,8 +376,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sync,
       runSync,
       session,
-      markUnlocked,
-      lockDevice,
+      signIn,
+      signOut,
       save,
       remove,
       toggleFavorite,

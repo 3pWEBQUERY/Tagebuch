@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated } from "@/lib/server/auth";
+import { currentUser } from "@/lib/server/auth";
 import { ensureSchema, getPool, isConfigured } from "@/lib/server/db";
 import { normalizeEntry, type Entry } from "@/lib/types";
 
@@ -30,15 +30,16 @@ const SELECT_CHANGED = `
          title, body, mood, tags, favorite,
          (EXTRACT(EPOCH FROM deleted_at) * 1000)::bigint AS deleted_at
     FROM entries
-   WHERE updated_at > to_timestamp($1 / 1000.0)
+   WHERE user_id = $1
+     AND updated_at > to_timestamp($2 / 1000.0)
    ORDER BY updated_at
 `;
 
 /* Beide Seiten dürfen offline weiterarbeiten – bei Kollisionen gewinnt die
    jüngere Fassung (updated_at). Deshalb das WHERE in beiden Upserts. */
 const UPSERT_ENTRY = `
-  INSERT INTO entries (id, created_at, updated_at, title, body, mood, tags, favorite, deleted_at)
-  VALUES ($1, to_timestamp($2 / 1000.0), to_timestamp($3 / 1000.0), $4, $5, $6, $7, $8, NULL)
+  INSERT INTO entries (id, user_id, created_at, updated_at, title, body, mood, tags, favorite, deleted_at)
+  VALUES ($1, $9, to_timestamp($2 / 1000.0), to_timestamp($3 / 1000.0), $4, $5, $6, $7, $8, NULL)
   ON CONFLICT (id) DO UPDATE
      SET created_at = LEAST(entries.created_at, EXCLUDED.created_at),
          updated_at = EXCLUDED.updated_at,
@@ -49,15 +50,17 @@ const UPSERT_ENTRY = `
          favorite   = EXCLUDED.favorite,
          deleted_at = NULL
    WHERE entries.updated_at < EXCLUDED.updated_at
+     AND entries.user_id = EXCLUDED.user_id
 `;
 
 const UPSERT_TOMBSTONE = `
-  INSERT INTO entries (id, created_at, updated_at, deleted_at)
-  VALUES ($1, to_timestamp($2 / 1000.0), to_timestamp($2 / 1000.0), to_timestamp($2 / 1000.0))
+  INSERT INTO entries (id, user_id, created_at, updated_at, deleted_at)
+  VALUES ($1, $3, to_timestamp($2 / 1000.0), to_timestamp($2 / 1000.0), to_timestamp($2 / 1000.0))
   ON CONFLICT (id) DO UPDATE
      SET updated_at = EXCLUDED.updated_at,
          deleted_at = EXCLUDED.deleted_at
    WHERE entries.updated_at <= EXCLUDED.updated_at
+     AND entries.user_id = EXCLUDED.user_id
 `;
 
 /**
@@ -123,12 +126,13 @@ function failed(err: unknown) {
 
 /** Nur abholen – für einen Abgleich ohne eigene Änderungen. */
 export async function GET(request: Request) {
-  if (!(await isAuthenticated())) return locked();
   if (!isConfigured()) return notConfigured();
+  const user = await currentUser();
+  if (!user) return locked();
   const since = Number(new URL(request.url).searchParams.get("since") ?? 0) || 0;
   try {
     await ensureSchema();
-    const { rows } = await getPool().query<Row>(SELECT_CHANGED, [since]);
+    const { rows } = await getPool().query<Row>(SELECT_CHANGED, [user.id, since]);
     return NextResponse.json(split(rows));
   } catch (err) {
     return failed(err);
@@ -137,8 +141,9 @@ export async function GET(request: Request) {
 
 /** Eigene Änderungen schicken und im selben Zug die fremden abholen. */
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) return locked();
   if (!isConfigured()) return notConfigured();
+  const user = await currentUser();
+  if (!user) return locked();
 
   let payload: SyncRequest;
   try {
@@ -172,14 +177,15 @@ export async function POST(request: Request) {
           e.mood,
           e.tags,
           e.favorite,
+          user.id,
         ]);
       }
       for (const t of deletions) {
-        await client.query(UPSERT_TOMBSTONE, [t.id, t.deletedAt]);
+        await client.query(UPSERT_TOMBSTONE, [t.id, t.deletedAt, user.id]);
       }
       await client.query(PRUNE_TOMBSTONES);
       // Erst nach dem Schreiben lesen, damit der Aufrufer einen konsistenten Stand bekommt.
-      const { rows } = await client.query<Row>(SELECT_CHANGED, [since]);
+      const { rows } = await client.query<Row>(SELECT_CHANGED, [user.id, since]);
       await client.query("COMMIT");
       return NextResponse.json(split(rows, entries));
     } catch (err) {

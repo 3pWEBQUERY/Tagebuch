@@ -36,12 +36,43 @@ export class SyncOffline extends Error {
   }
 }
 
-/** Sitzung fehlt oder ist abgelaufen – die Oberfläche muss nach der Passphrase fragen. */
+/** Sitzung fehlt oder ist abgelaufen – die Oberfläche muss zur Anmeldung. */
 export class SyncLocked extends Error {
   constructor() {
     super("Nicht angemeldet");
     this.name = "SyncLocked";
   }
+}
+
+/**
+ * Ein Gerät kann nacheinander mehrere Konten sehen. Die lokale Kopie gehört
+ * immer genau einem davon – sonst lädt das nächste Konto fremde Einträge hoch.
+ */
+const USER_KEY = "tb:user";
+
+export function localUserId(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  return localStorage.getItem(USER_KEY);
+}
+
+export async function adoptUser(userId: string): Promise<boolean> {
+  const previous = localUserId();
+  if (previous === userId) return false;
+  // Kontowechsel: alles Lokale gehört der vorigen Person. Es liegt in deren
+  // Datenbank, hier muss es weg.
+  await db.removeAll();
+  await db.dropTombstones((await db.readTombstones()).map((t) => t.id));
+  resetSyncMarks();
+  localStorage.setItem(USER_KEY, userId);
+  return true;
+}
+
+/** Beim Abmelden bleibt nichts Lesbares auf dem Gerät zurück. */
+export async function clearLocalData(): Promise<void> {
+  await db.removeAll();
+  await db.dropTombstones((await db.readTombstones()).map((t) => t.id));
+  resetSyncMarks();
+  localStorage.removeItem(USER_KEY);
 }
 
 /** Der Server hat keine Datenbank konfiguriert – automatisches Wiederholen ist zwecklos. */
@@ -74,6 +105,14 @@ export function lastSyncedAt(): number | null {
 export function resetSyncMarks(): void {
   localStorage.removeItem(PUSH_KEY);
   localStorage.removeItem(PULL_KEY);
+}
+
+/** Gibt es Änderungen, die noch nicht in der Datenbank stehen? */
+export async function hasPendingChanges(local: Entry[]): Promise<boolean> {
+  const lastPush = readMark(PUSH_KEY);
+  if (local.some((e) => e.updatedAt > lastPush)) return true;
+  const tombstones = await db.readTombstones();
+  return tombstones.some((t) => t.deletedAt > lastPush);
 }
 
 /** Merkt eine lokale Löschung vor, damit der Abgleich sie weitergeben kann. */
@@ -146,48 +185,4 @@ export async function syncEntries(local: Entry[]): Promise<SyncOutcome> {
   localStorage.setItem(PULL_KEY, String(data.serverTime));
 
   return { applied, removed, pushed: changed.length + deletions.length, serverTime: data.serverTime };
-}
-
-/* ── Sitzung ────────────────────────────────────────────────
-   Das Cookie setzt der Server (httpOnly); hier wird nur gefragt und angemeldet. */
-
-const UNLOCKED_KEY = "tb:unlocked";
-
-export type SessionState = { required: boolean; authenticated: boolean };
-
-/** Merkt sich, dass dieses Gerät schon einmal offen war – für den Offline-Start. */
-export function wasUnlocked(): boolean {
-  // Wird auch beim Prerender aufgerufen, wo es keinen Speicher gibt.
-  if (typeof localStorage === "undefined") return false;
-  return localStorage.getItem(UNLOCKED_KEY) === "1";
-}
-
-export async function readSession(): Promise<SessionState> {
-  const response = await fetch("/api/session", { cache: "no-store" });
-  if (!response.ok) throw new Error("Sitzungsstatus nicht abrufbar");
-  const state = (await response.json()) as SessionState;
-  if (state.authenticated) localStorage.setItem(UNLOCKED_KEY, "1");
-  return state;
-}
-
-export async function unlock(password: string): Promise<void> {
-  const response = await fetch("/api/session", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ password }),
-  });
-  if (!response.ok) {
-    const detail = await response
-      .json()
-      .then((d: { error?: string }) => d.error)
-      .catch(() => undefined);
-    throw new Error(detail ?? "Anmeldung fehlgeschlagen");
-  }
-  localStorage.setItem(UNLOCKED_KEY, "1");
-}
-
-export async function lockAgain(): Promise<void> {
-  await fetch("/api/session", { method: "DELETE" });
-  localStorage.removeItem(UNLOCKED_KEY);
-  resetSyncMarks();
 }

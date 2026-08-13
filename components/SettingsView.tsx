@@ -35,10 +35,11 @@ export function SettingsView({ install }: { install: InstallState }) {
     sync,
     syncNow,
     session,
-    lockDevice,
+    signOut,
   } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [askWipe, setAskWipe] = useState(false);
+  const [askSignOut, setAskSignOut] = useState(false);
 
   const themeIndex = THEMES.findIndex((t) => t.id === theme);
 
@@ -166,11 +167,25 @@ export function SettingsView({ install }: { install: InstallState }) {
             Geschrieben wird immer zuerst auf dieses Gerät – der Abgleich mit der Datenbank läuft
             danach. Ohne Netz bleibt alles bedienbar, Änderungen gehen beim nächsten Mal mit.
           </p>
-          {session.required && (
-            <button className="btn btnFull" type="button" onClick={() => void lockDevice()}>
-              Dieses Gerät sperren
+          <div className="row rowBetween">
+            <div>
+              <span className="rowLabel">Angemeldet</span>
+              <span className="rowHint">{session.user?.email ?? "–"}</span>
+            </div>
+            <button
+              className="btn"
+              type="button"
+              onClick={async () => {
+                if ((await signOut()) === "unsynced") setAskSignOut(true);
+              }}
+            >
+              Abmelden
             </button>
-          )}
+          </div>
+          <p className="cardText" style={{ margin: "10px 0 0" }}>
+            Abmelden entfernt die Einträge von diesem Gerät. In deinem Konto bleiben sie
+            erhalten und sind nach der nächsten Anmeldung wieder da.
+          </p>
         </section>
 
         <section className="card glass" aria-labelledby="data-h">
@@ -181,9 +196,7 @@ export function SettingsView({ install }: { install: InstallState }) {
           </div>
           <p className="cardText">
             Einträge werden auf dem Gerät gespeichert und mit deiner Postgres-Datenbank abgeglichen.
-            {session.required
-              ? " Der Zugang ist durch eine Passphrase geschützt."
-              : " Achtung: Es ist keine Passphrase gesetzt – wer die Adresse kennt, sieht die Einträge."}{" "}
+            {" "}Sie hängen an deinem Konto und sind für andere Konten nicht sichtbar.{" "}
             Ein Export bleibt deine Sicherung.
           </p>
           <div className="btnRow">
@@ -248,6 +261,18 @@ export function SettingsView({ install }: { install: InstallState }) {
           </div>
         </section>
       </div>
+
+      <ConfirmDialog
+        open={askSignOut}
+        title="Trotzdem abmelden?"
+        text="Einige Änderungen konnten nicht in die Datenbank geschrieben werden – vermutlich fehlt die Verbindung. Beim Abmelden werden sie von diesem Gerät entfernt und sind dann verloren."
+        confirmLabel="Abmelden und verwerfen"
+        onCancel={() => setAskSignOut(false)}
+        onConfirm={async () => {
+          setAskSignOut(false);
+          await signOut({ force: true });
+        }}
+      />
 
       <ConfirmDialog
         open={askWipe}

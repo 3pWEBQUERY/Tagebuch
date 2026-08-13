@@ -1476,6 +1476,22 @@ mark {
   font-weight: 560;
   color: var(--danger);
 }
+.lockTabs {
+  width: 100%;
+  margin-bottom: 2px;
+}
+.lockHint {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.linkBtn {
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 620;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* ── 10 Overlays ──────────────────────────────────────────── */
 .confirm {

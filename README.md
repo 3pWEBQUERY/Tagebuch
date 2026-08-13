@@ -7,10 +7,10 @@ Geschrieben wird zuerst auf das Gerät (IndexedDB), danach gleicht die App im Hi
 mit einer **Postgres-Datenbank** ab. Ohne Netz bleibt alles bedienbar; Änderungen gehen beim
 nächsten Abgleich mit.
 
-Der Zugang ist über eine Passphrase geschützt (`APP_PASSWORD`): Beim ersten Start fragt die App
-danach, die Sitzung hält anschließend ein Jahr pro Gerät. Ist die Variable nicht gesetzt, läuft
-alles offen – das ist nur für die lokale Entwicklung gedacht und wird in den Einstellungen
-deutlich angezeigt.
+Der Zugang läuft über ein Konto: registrieren mit E-Mail und Passwort, danach anmelden. Einträge
+hängen am Konto und sind für andere Konten unsichtbar – auch dann, wenn jemand die id eines
+fremden Eintrags errät. Passwörter liegen als scrypt-Hash, die Sitzung ist ein signiertes
+HttpOnly-Cookie mit einem Jahr Laufzeit.
 
 ## Funktionen
 
@@ -68,11 +68,12 @@ Verbindung als Referenz, damit sie immer auf den richtigen Dienst zeigt:
 
 ```bash
 railway variables --service Tagebuch --set 'DATABASE_URL=${{Postgres.DATABASE_URL}}'
-railway variables --service Tagebuch --set 'APP_PASSWORD=deine-passphrase'
+railway variables --service Tagebuch --set "AUTH_SECRET=$(openssl rand -hex 32)"
 railway up --service Tagebuch
 ```
 
-Die Passphrase lässt sich jederzeit ändern; alle Geräte müssen sich danach neu anmelden.
+`AUTH_SECRET` signiert die Sitzungen – ändert man ihn, müssen sich alle Geräte neu anmelden.
+Mit `SIGNUP_CODE` lässt sich die Registrierung auf Eingeweihte beschränken.
 
 Die interne Adresse `postgres.railway.internal` ist **nur innerhalb von Railway**
 erreichbar. Wer vom eigenen Rechner auf dieselbe Datenbank will, aktiviert beim
