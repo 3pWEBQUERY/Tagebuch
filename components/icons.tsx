@@ -58,3 +58,51 @@ export const IconDrop = (p: P) => (
     <path d="M12 3.6c2.6 3.1 4.4 5.6 4.4 7.9a4.4 4.4 0 0 1-8.8 0c0-2.3 1.8-4.8 4.4-7.9Z" />
   </svg>
 );
+
+export const IconComment = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.5 9.5 0 0 1-3.2-.6L4 21l1.4-4.2A8.2 8.2 0 0 1 3.6 11.5 8.4 8.4 0 0 1 12 3.5a8.4 8.4 0 0 1 9 8Z" />
+  </svg>
+);
+
+export const IconUsers = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <circle cx="9" cy="8" r="3.4" />
+    <path d="M3.5 20a5.5 5.5 0 0 1 11 0" />
+    <path d="M16 5.2a3.4 3.4 0 0 1 0 6.6M17.5 14.6A5.5 5.5 0 0 1 20.5 20" />
+  </svg>
+);
+
+export const IconCompass = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <circle cx="12" cy="12" r="8.6" />
+    <path d="m15 9-1.8 4.2L9 15l1.8-4.2L15 9Z" />
+  </svg>
+);
+
+export const IconBack = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path d="M14.5 5.5 8 12l6.5 6.5" />
+  </svg>
+);
+
+export const IconLock = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <rect x="4.8" y="10.4" width="14.4" height="9.4" rx="2.6" />
+    <path d="M8.4 10.4V7.8a3.6 3.6 0 0 1 7.2 0v2.6" />
+  </svg>
+);
+
+export const IconGlobe = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <circle cx="12" cy="12" r="8.6" />
+    <path d="M3.4 12h17.2M12 3.4c2.2 2.4 3.4 5.4 3.4 8.6S14.2 18.2 12 20.6c-2.2-2.4-3.4-5.4-3.4-8.6S9.8 5.8 12 3.4Z" />
+  </svg>
+);
+
+export const IconSend = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path d="M20 12 4.5 5.5 7 12l-2.5 6.5L20 12Z" />
+    <path d="M7 12h13" />
+  </svg>
+);

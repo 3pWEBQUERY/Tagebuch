@@ -6,6 +6,7 @@ import type { InstallState } from "@/lib/install";
 import { useStore, type SyncStatus } from "@/lib/store";
 import { ACCENTS, normalizeEntry, type Entry, type ThemePref } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { IconBack } from "./icons";
 
 const THEMES: { id: ThemePref; label: string }[] = [
   { id: "light", label: "Hell" },
@@ -22,7 +23,7 @@ const SYNC_LABEL: Record<SyncStatus, string> = {
   locked: "Gesperrt – Passphrase nötig",
 };
 
-export function SettingsView({ install }: { install: InstallState }) {
+export function SettingsView({ install, onBack }: { install: InstallState; onBack: () => void }) {
   const {
     entries,
     theme,
@@ -85,6 +86,11 @@ export function SettingsView({ install }: { install: InstallState }) {
   return (
     <section className="view" id="view-settings" aria-labelledby="settings-heading">
       <div className="wrap">
+        <button className="btn btnGhost backBtn" type="button" onClick={onBack}>
+          <IconBack />
+          Zurück
+        </button>
+
         <div className="hero">
           <p className="heroKicker">Deine App</p>
           <h1 className="heroTitle" id="settings-heading">

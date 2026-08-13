@@ -1,17 +1,22 @@
 "use client";
 
 import { useRef } from "react";
-import { IconBook, IconChart, IconGear } from "./icons";
+import { Avatar } from "./Avatar";
+import { IconBook, IconChart, IconUsers } from "./icons";
 
-export type ViewId = "journal" | "insights" | "settings";
+export type ViewId = "journal" | "feed" | "insights" | "profile";
 
-const TABS: { id: ViewId; label: string; Icon: (p: { className?: string }) => React.JSX.Element }[] = [
-  { id: "journal", label: "Journal", Icon: IconBook },
-  { id: "insights", label: "Verlauf", Icon: IconChart },
-  { id: "settings", label: "Mehr", Icon: IconGear },
-];
-
-export function TabBar({ view, onView }: { view: ViewId; onView: (v: ViewId) => void }) {
+export function TabBar({
+  view,
+  onView,
+  profileHandle,
+  profileName,
+}: {
+  view: ViewId;
+  onView: (v: ViewId) => void;
+  profileHandle: string;
+  profileName: string;
+}) {
   const ref = useRef<HTMLElement>(null);
 
   return (
@@ -28,18 +33,47 @@ export function TabBar({ view, onView }: { view: ViewId; onView: (v: ViewId) => 
       }}
       onPointerLeave={() => ref.current?.style.setProperty("--mx", "50%")}
     >
-      {TABS.map(({ id, label, Icon }) => (
-        <button
-          key={id}
-          type="button"
-          className={`tab${view === id ? " tabActive" : ""}`}
-          aria-current={view === id ? "page" : undefined}
-          onClick={() => onView(id)}
-        >
-          <Icon />
-          <span>{label}</span>
-        </button>
-      ))}
+      <button
+        type="button"
+        className={`tab${view === "journal" ? " tabActive" : ""}`}
+        aria-current={view === "journal" ? "page" : undefined}
+        onClick={() => onView("journal")}
+      >
+        <IconBook />
+        <span>Journal</span>
+      </button>
+
+      <button
+        type="button"
+        className={`tab${view === "feed" ? " tabActive" : ""}`}
+        aria-current={view === "feed" ? "page" : undefined}
+        onClick={() => onView("feed")}
+      >
+        <IconUsers />
+        <span>Feed</span>
+      </button>
+
+      <button
+        type="button"
+        className={`tab${view === "insights" ? " tabActive" : ""}`}
+        aria-current={view === "insights" ? "page" : undefined}
+        onClick={() => onView("insights")}
+      >
+        <IconChart />
+        <span>Verlauf</span>
+      </button>
+
+      {/* Das eigene Profil trägt das eigene Bild – wie man es aus sozialen
+          Apps kennt, und es macht den Tab auf einen Blick unterscheidbar. */}
+      <button
+        type="button"
+        className={`tab tabProfile${view === "profile" ? " tabActive" : ""}`}
+        aria-current={view === "profile" ? "page" : undefined}
+        onClick={() => onView("profile")}
+      >
+        <Avatar handle={profileHandle} name={profileName} size={22} className="tabAvatar" />
+        <span>Profil</span>
+      </button>
     </nav>
   );
 }

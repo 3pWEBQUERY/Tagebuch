@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { time } from "@/lib/format";
 import { moodOf, type Entry } from "@/lib/types";
-import { IconHeart } from "./icons";
+import { IconGlobe, IconHeart } from "./icons";
 
 /** Hebt den Suchtreffer hervor, ohne HTML aus Nutzertext zu interpretieren. */
 function highlight(text: string, query: string) {
@@ -64,6 +64,12 @@ function EntryCardBase({ entry, query, index, onOpen }: Props) {
       <span className="entryMain">
         <span className="entryTop">
           <span className="entryTitle">{highlight(titleOf(entry), query)}</span>
+          {entry.visibility === "public" && (
+            <span className="entryPublic" title="Öffentlich sichtbar">
+              <IconGlobe />
+              <span className="sr-only">Öffentlich sichtbar</span>
+            </span>
+          )}
           {entry.favorite && (
             <span className="entryFav" aria-label="Favorit">
               <IconHeart />

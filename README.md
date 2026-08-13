@@ -1,7 +1,11 @@
 # Tagebuch
 
-Eine installierbare Tagebuch-App (PWA) für Gedanken und Gefühle – mit Stimmungs­erfassung,
-Verlauf, Hell-/Dunkelmodus und einer Oberfläche im Liquid-Glass-Stil.
+Eine installierbare Tagebuch-App (PWA) für Gedanken und Gefühle – privat geführt, mit
+optionalem sozialem Teil: Profile, Feed, Folgen, Herzen und Kommentare.
+
+**Der Grundsatz:** Jeder Eintrag ist privat und bleibt es, bis er ausdrücklich veröffentlicht
+wird. Es gibt keinen Automatismus und keine Voreinstellung, die das ändert. Ein Tagebuch,
+das versehentlich öffentlich wird, wäre ein Schaden, den man nicht zurücknehmen kann.
 
 Geschrieben wird zuerst auf das Gerät (IndexedDB), danach gleicht die App im Hintergrund
 mit einer **Postgres-Datenbank** ab. Ohne Netz bleibt alles bedienbar; Änderungen gehen beim
@@ -32,7 +36,7 @@ HttpOnly-Cookie mit einem Jahr Laufzeit.
 | | |
 |---|---|
 | Framework | Next.js 16 (App Router, React 19, TypeScript) |
-| Datenbank | PostgreSQL über `pg`, eine Tabelle, Schema legt sich beim ersten Zugriff selbst an |
+| Datenbank | PostgreSQL über `pg`: Konten, Einträge, Folgen, Herzen, Kommentare; Schema legt sich beim ersten Zugriff selbst an |
 | Speicher | IndexedDB (führende Kopie), localStorage (Theme, Akzentfarbe, Sync-Marken) |
 | Styling | eigenes CSS-Design-System, keine UI-Bibliothek |
 | Offline | eigener Service Worker (`public/sw.js`) |
@@ -84,9 +88,10 @@ Postgres-Dienst den TCP-Proxy und nutzt dessen `DATABASE_PUBLIC_URL`.
 ```
 app/            Layout, Seite, globales Design-System (globals.css)
 app/api/entries Abgleich-Endpunkt: Änderungen entgegennehmen und ausliefern
+app/api/feed    Feed, Profile, Folgen, Herzen, Kommentare
 components/     Oberfläche: Journal, Editor, Verlauf, Einstellungen, Navigation
 lib/            IndexedDB, Zustand, Abgleich (sync.ts), Formate, Typen
-lib/server/     Datenbankpool und Schema – ausschließlich serverseitig
+lib/server/     Datenbankpool, Schema, Konten, soziale Abfragen – nur serverseitig
 public/         Manifest, Service Worker, Icons
 ```
 

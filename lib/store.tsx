@@ -29,7 +29,7 @@ import {
   SyncOffline,
   syncEntries,
 } from "./sync";
-import { ACCENTS, type Entry, type ThemePref } from "./types";
+import { ACCENTS, type Entry, type Profile, type ThemePref } from "./types";
 
 const THEME_KEY = "tb:theme";
 const ACCENT_KEY = "tb:accent";
@@ -50,6 +50,7 @@ export type SyncState = {
 
 export type Session = {
   user: SessionUser | null;
+  profile: Profile | null;
   signupCodeRequired: boolean;
   checked: boolean;
 };
@@ -60,7 +61,8 @@ type Store = {
   sync: SyncState;
   syncNow: () => Promise<void>;
   session: Session;
-  signIn: (user: SessionUser) => Promise<void>;
+  setProfile: (profile: Profile) => void;
+  signIn: (user: SessionUser, profile: Profile | null) => Promise<void>;
   signOut: (options?: { force?: boolean }) => Promise<"ok" | "unsynced">;
   deleteAccount: () => Promise<void>;
   save: (entry: Entry) => Promise<void>;
@@ -110,6 +112,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [sync, setSync] = useState<SyncState>({ status: "idle", lastSyncedAt: null, error: null });
   const [session, setSession] = useState<Session>({
     user: null,
+    profile: null,
     signupCodeRequired: false,
     checked: false,
   });
@@ -193,12 +196,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setProfile = useCallback((profile: Profile) => {
+    setSession((s) => ({ ...s, profile }));
+  }, []);
+
   const signIn = useCallback(
-    async (user: SessionUser) => {
+    async (user: SessionUser, profile: Profile | null) => {
       // Frisch angemeldet: gehört die lokale Kopie jemand anderem, fliegt sie raus.
       const switched = await adoptUser(user.id);
       if (switched) setEntries([]);
-      setSession((s) => ({ ...s, user, checked: true }));
+      setSession((s) => ({ ...s, user, profile, checked: true }));
       void runSync();
     },
     [runSync],
@@ -369,6 +376,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sync,
       syncNow: runSync,
       session,
+      setProfile,
       signIn,
       signOut,
       deleteAccount,
@@ -391,6 +399,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sync,
       runSync,
       session,
+      setProfile,
       signIn,
       signOut,
       deleteAccount,

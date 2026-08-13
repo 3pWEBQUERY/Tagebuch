@@ -46,6 +46,19 @@ export function dayLabel(ts: number, now = Date.now()): string {
   return sameYear ? fmtWeekday.format(ts) : fmtFull.format(ts);
 }
 
+const rtf = new Intl.RelativeTimeFormat(LOCALE, { numeric: "auto", style: "long" });
+
+/** „gerade eben“, „vor 3 Std.“, „vor 2 Tagen“ – ab einer Woche das Datum. */
+export function relativeTime(ts: number, now = Date.now()): string {
+  const seconds = Math.round((ts - now) / 1000);
+  const abs = Math.abs(seconds);
+  if (abs < 45) return "gerade eben";
+  if (abs < 3600) return rtf.format(Math.round(seconds / 60), "minute");
+  if (abs < 86_400) return rtf.format(Math.round(seconds / 3600), "hour");
+  if (abs < 604_800) return rtf.format(Math.round(seconds / 86_400), "day");
+  return shortDate(ts);
+}
+
 export function greeting(now = new Date()): string {
   const h = now.getHours();
   if (h < 5) return "Gute Nacht";

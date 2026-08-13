@@ -16,6 +16,13 @@ const SCHEMA = `
     created_at    timestamptz NOT NULL DEFAULT now()
   );
 
+  -- Profil. Der Handle ist die öffentliche Adresse (@name); die E-Mail bleibt
+  -- privat und taucht nirgends im Sozialen auf.
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS handle       text;
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name text;
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS bio          text NOT NULL DEFAULT '';
+  CREATE UNIQUE INDEX IF NOT EXISTS users_handle_key ON users (lower(handle));
+
   CREATE TABLE IF NOT EXISTS entries (
     id          text        PRIMARY KEY,
     created_at  timestamptz NOT NULL,
@@ -34,8 +41,43 @@ const SCHEMA = `
   -- über das Grabstein-Aufräumen aus.
   ALTER TABLE entries ADD COLUMN IF NOT EXISTS user_id text;
 
+  -- Sichtbarkeit. Der Vorgabewert ist 'private' und das ist keine Kosmetik:
+  -- ein Tagebuch, das versehentlich öffentlich wird, ist ein Schaden, den
+  -- man nicht zurücknehmen kann. Veröffentlicht wird nur auf Ansage.
+  ALTER TABLE entries ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'private';
+  ALTER TABLE entries ADD COLUMN IF NOT EXISTS published_at timestamptz;
+
   CREATE INDEX IF NOT EXISTS entries_updated_at_idx ON entries (updated_at);
   CREATE INDEX IF NOT EXISTS entries_user_updated_idx ON entries (user_id, updated_at);
+  -- Der Feed fragt immer „öffentlich, nicht gelöscht, neueste zuerst“.
+  CREATE INDEX IF NOT EXISTS entries_public_idx
+    ON entries (published_at DESC)
+    WHERE visibility = 'public' AND deleted_at IS NULL;
+
+  CREATE TABLE IF NOT EXISTS follows (
+    follower_id text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    followee_id text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (follower_id, followee_id),
+    CONSTRAINT follows_not_self CHECK (follower_id <> followee_id)
+  );
+  CREATE INDEX IF NOT EXISTS follows_followee_idx ON follows (followee_id);
+
+  CREATE TABLE IF NOT EXISTS likes (
+    entry_id   text        NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    user_id    text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (entry_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS comments (
+    id         text        PRIMARY KEY,
+    entry_id   text        NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    user_id    text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body       text        NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE INDEX IF NOT EXISTS comments_entry_idx ON comments (entry_id, created_at);
 `;
 
 /**

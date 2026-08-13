@@ -27,7 +27,8 @@ const SELECT_CHANGED = `
   SELECT id,
          (EXTRACT(EPOCH FROM created_at) * 1000)::bigint AS created_at,
          (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint AS updated_at,
-         title, body, mood, tags, favorite,
+         title, body, mood, tags, favorite, visibility,
+         (EXTRACT(EPOCH FROM published_at) * 1000)::bigint AS published_at,
          (EXTRACT(EPOCH FROM deleted_at) * 1000)::bigint AS deleted_at
     FROM entries
    WHERE user_id = $1
@@ -38,8 +39,10 @@ const SELECT_CHANGED = `
 /* Beide Seiten dürfen offline weiterarbeiten – bei Kollisionen gewinnt die
    jüngere Fassung (updated_at). Deshalb das WHERE in beiden Upserts. */
 const UPSERT_ENTRY = `
-  INSERT INTO entries (id, user_id, created_at, updated_at, title, body, mood, tags, favorite, deleted_at)
-  VALUES ($1, $9, to_timestamp($2 / 1000.0), to_timestamp($3 / 1000.0), $4, $5, $6, $7, $8, NULL)
+  INSERT INTO entries (id, user_id, created_at, updated_at, title, body, mood, tags, favorite,
+                       visibility, published_at, deleted_at)
+  VALUES ($1, $9, to_timestamp($2 / 1000.0), to_timestamp($3 / 1000.0), $4, $5, $6, $7, $8,
+          $10, CASE WHEN $10 = 'public' THEN COALESCE(to_timestamp($11 / 1000.0), now()) END, NULL)
   ON CONFLICT (id) DO UPDATE
      SET created_at = LEAST(entries.created_at, EXCLUDED.created_at),
          updated_at = EXCLUDED.updated_at,
@@ -48,6 +51,13 @@ const UPSERT_ENTRY = `
          mood       = EXCLUDED.mood,
          tags       = EXCLUDED.tags,
          favorite   = EXCLUDED.favorite,
+         visibility = EXCLUDED.visibility,
+         -- Einmal veröffentlicht behält der Eintrag seinen Platz im Feed;
+         -- eine spätere Korrektur schiebt ihn nicht wieder nach oben.
+         published_at = CASE
+                          WHEN EXCLUDED.visibility <> 'public' THEN NULL
+                          ELSE COALESCE(entries.published_at, EXCLUDED.published_at)
+                        END,
          deleted_at = NULL
    WHERE entries.updated_at < EXCLUDED.updated_at
      AND entries.user_id = EXCLUDED.user_id
@@ -76,6 +86,8 @@ const PRUNE_TOMBSTONES = `
 
 type Row = {
   id: string;
+  visibility: string | null;
+  published_at: string | null;
   created_at: string;
   updated_at: string;
   title: string | null;
@@ -97,6 +109,8 @@ function toEntry(row: Row): Entry {
     mood: (row.mood as Entry["mood"]) ?? null,
     tags: row.tags ?? [],
     favorite: row.favorite,
+    visibility: row.visibility === "public" ? "public" : "private",
+    publishedAt: row.published_at === null ? null : Number(row.published_at),
   };
 }
 
@@ -178,6 +192,8 @@ export async function POST(request: Request) {
           e.tags,
           e.favorite,
           user.id,
+          e.visibility,
+          e.publishedAt,
         ]);
       }
       for (const t of deletions) {

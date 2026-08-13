@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { countWords, stamp } from "@/lib/format";
 import { useStore } from "@/lib/store";
-import { MOODS, type Entry, type MoodValue } from "@/lib/types";
+import { MOODS, type Entry, type MoodValue, type Visibility } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { IconClose, IconHeart, IconTrash } from "./icons";
+import { IconClose, IconGlobe, IconHeart, IconLock, IconTrash } from "./icons";
 
 const AUTOSAVE_MS = 700;
 const CLOSE_MS = 180;
@@ -14,7 +14,8 @@ type Props = {
   entry: Entry;
   /** true, solange der Eintrag noch nie Inhalt hatte und deshalb nicht gespeichert wurde. */
   isNew: boolean;
-  onClose: () => void;
+  /** Meldet zurück, ob am Ende etwas Öffentliches steht – dann ist der Feed veraltet. */
+  onClose: (published: boolean) => void;
 };
 
 export function EditorSheet({ entry, isNew, onClose }: Props) {
@@ -29,6 +30,7 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
   const [mood, setMood] = useState<MoodValue | null>(entry.mood);
   const [tags, setTags] = useState<string[]>(entry.tags);
   const [favorite, setFavorite] = useState(entry.favorite);
+  const [visibility, setVisibility] = useState<Visibility>(entry.visibility);
   const [tagDraft, setTagDraft] = useState("");
   const [savedHint, setSavedHint] = useState("");
   const [closing, setClosing] = useState(false);
@@ -45,9 +47,12 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
       mood,
       tags,
       favorite,
+      visibility,
+      // Der erste Wechsel auf öffentlich setzt den Zeitpunkt; danach bleibt er.
+      publishedAt: visibility === "public" ? (entry.publishedAt ?? Date.now()) : null,
       updatedAt: Date.now(),
     }),
-    [entry, title, body, mood, tags, favorite],
+    [entry, title, body, mood, tags, favorite, visibility],
   );
 
   const hasContent = title.trim() !== "" || body.trim() !== "" || tags.length > 0 || mood !== null;
@@ -89,7 +94,7 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
     return () => {
       if (timerRef.current) window.clearTimeout(timerRef.current);
     };
-  }, [title, body, mood, tags, favorite, hasContent, current, save, flash]);
+  }, [title, body, mood, tags, favorite, visibility, hasContent, current, save, flash]);
 
   const mark = () => {
     dirty.current = true;
@@ -105,9 +110,9 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
     setClosing(true);
     window.setTimeout(() => {
       dialogRef.current?.close();
-      onClose();
+      onClose(hasContent && visibility === "public");
     }, CLOSE_MS);
-  }, [hasContent, save, current, remove, entry.id, onClose]);
+  }, [hasContent, save, current, remove, entry.id, onClose, visibility]);
 
   /** Nimmt mehrere Themen auf einmal an – beim schnellen Tippen kommen
    *  „Sport,Schlaf,“ sonst als ein einziger Wert im selben Change-Event an. */
@@ -283,6 +288,43 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
             </div>
           </div>
 
+          <fieldset className="visibility">
+            <legend className="moodsLegend">Wer darf das sehen?</legend>
+            <div className="visibilityRow">
+              <button
+                type="button"
+                className="visOption"
+                aria-pressed={visibility === "private"}
+                onClick={() => {
+                  mark();
+                  setVisibility("private");
+                }}
+              >
+                <IconLock />
+                <span className="visName">Nur ich</span>
+                <span className="visHint">Bleibt in deinem Journal</span>
+              </button>
+              <button
+                type="button"
+                className="visOption visOptionPublic"
+                aria-pressed={visibility === "public"}
+                onClick={() => {
+                  mark();
+                  setVisibility("public");
+                }}
+              >
+                <IconGlobe />
+                <span className="visName">Öffentlich</span>
+                <span className="visHint">Erscheint in deinem Profil und im Feed</span>
+              </button>
+            </div>
+            {visibility === "public" && (
+              <p className="visWarning">
+                Dieser Eintrag ist für alle angemeldeten Menschen sichtbar – mit deinem Namen.
+              </p>
+            )}
+          </fieldset>
+
           <footer className="sheetFoot">
             <span>
               {words} {words === 1 ? "Wort" : "Wörter"}
@@ -308,7 +350,7 @@ export function EditorSheet({ entry, isNew, onClose }: Props) {
           setClosing(true);
           window.setTimeout(() => {
             dialogRef.current?.close();
-            onClose();
+            onClose(true);
           }, CLOSE_MS);
         }}
       />

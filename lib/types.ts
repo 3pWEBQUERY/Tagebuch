@@ -1,5 +1,8 @@
 export type MoodValue = 1 | 2 | 3 | 4 | 5;
 
+/** Privat ist der Normalfall. Öffentlich wird ein Eintrag nur auf Ansage. */
+export type Visibility = "private" | "public";
+
 export type Entry = {
   id: string;
   createdAt: number;
@@ -9,6 +12,55 @@ export type Entry = {
   mood: MoodValue | null;
   tags: string[];
   favorite: boolean;
+  visibility: Visibility;
+  /** Zeitpunkt der ersten Veröffentlichung – im Feed die Sortiergröße. */
+  publishedAt: number | null;
+};
+
+/* ── Soziales ───────────────────────────────────────────────── */
+
+export type Profile = {
+  id: string;
+  handle: string;
+  displayName: string;
+  bio: string;
+  /** Zahlen für die Profilkopfzeile. */
+  entryCount: number;
+  followerCount: number;
+  followingCount: number;
+  /** Folgt die abfragende Person diesem Profil? */
+  following: boolean;
+  /** Bin ich das selbst? */
+  isMe: boolean;
+};
+
+export type FeedAuthor = {
+  id: string;
+  handle: string;
+  displayName: string;
+};
+
+export type FeedItem = {
+  id: string;
+  author: FeedAuthor;
+  publishedAt: number;
+  createdAt: number;
+  title: string;
+  body: string;
+  mood: MoodValue | null;
+  tags: string[];
+  likeCount: number;
+  commentCount: number;
+  liked: boolean;
+  mine: boolean;
+};
+
+export type Comment = {
+  id: string;
+  author: FeedAuthor;
+  body: string;
+  createdAt: number;
+  mine: boolean;
 };
 
 export type Mood = {
@@ -60,6 +112,9 @@ export function normalizeEntry(raw: unknown): Entry | null {
   if (!isEntry(raw)) return null;
   const e = raw as Entry;
   const mood = typeof e.mood === "number" && e.mood >= 1 && e.mood <= 5 ? (Math.round(e.mood) as MoodValue) : null;
+  // Unbekannte oder fehlende Sichtbarkeit wird privat. Im Zweifel gegen
+  // das Veröffentlichen zu entscheiden ist hier die einzig vertretbare Wahl.
+  const visibility: Visibility = e.visibility === "public" ? "public" : "private";
   return {
     id: e.id,
     createdAt: e.createdAt,
@@ -69,5 +124,8 @@ export function normalizeEntry(raw: unknown): Entry | null {
     mood,
     tags: e.tags.filter((t): t is string => typeof t === "string").slice(0, 24),
     favorite: e.favorite === true,
+    visibility,
+    publishedAt:
+      visibility === "public" && typeof e.publishedAt === "number" ? e.publishedAt : null,
   };
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { login, register, type SessionUser } from "@/lib/auth";
+import type { Profile } from "@/lib/types";
 import { IconDrop } from "./icons";
 
 type Mode = "login" | "register";
@@ -11,7 +12,7 @@ export function AuthScreen({
   onSignedIn,
 }: {
   signupCodeRequired: boolean;
-  onSignedIn: (user: SessionUser) => void;
+  onSignedIn: (result: { user: SessionUser; profile: Profile | null }) => void;
 }) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
@@ -31,11 +32,11 @@ export function AuthScreen({
     setBusy(true);
     setError(null);
     try {
-      const user =
+      const result =
         mode === "login"
           ? await login(email, password)
           : await register(email, password, signupCodeRequired ? code : undefined);
-      onSignedIn(user);
+      onSignedIn(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Das hat nicht geklappt.");
       setPassword("");

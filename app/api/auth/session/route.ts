@@ -10,6 +10,7 @@ import {
   tooManyAttempts,
 } from "@/lib/server/auth";
 import { ensureSchema, isConfigured } from "@/lib/server/db";
+import { ensureProfile, profileById } from "@/lib/server/social";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,8 +31,15 @@ export async function GET() {
   if (!isConfigured()) return noDatabase();
   try {
     await ensureSchema();
+    const user = await currentUser();
+    if (!user) {
+      return NextResponse.json({ user: null, profile: null, signupCodeRequired: signupCodeRequired() });
+    }
+    // Konten aus der Zeit vor den Profilen bekommen hier ihren Handle.
+    await ensureProfile(user.id, user.email);
     return NextResponse.json({
-      user: await currentUser(),
+      user,
+      profile: await profileById(user.id, user.id),
       signupCodeRequired: signupCodeRequired(),
     });
   } catch {
@@ -68,8 +76,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "E-Mail oder Passwort stimmt nicht." }, { status: 401 });
     }
     clearAttempts(`login:${ip}`);
+    await ensureProfile(user.id, user.email);
     await startSession(user);
-    return NextResponse.json({ user });
+    return NextResponse.json({ user, profile: await profileById(user.id, user.id) });
   } catch (err) {
     console.error("[api/auth/session]", err);
     return NextResponse.json({ error: "Anmeldung gerade nicht möglich." }, { status: 502 });

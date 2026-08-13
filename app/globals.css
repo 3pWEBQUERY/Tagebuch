@@ -1693,3 +1693,605 @@ mark {
 .view {
   view-transition-name: view;
 }
+
+/* ============================================================
+   12 Soziales — Feed, Beiträge, Profile, Kommentare
+   ============================================================ */
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.22), inset 0 1px 2px rgba(255, 255, 255, 0.4),
+    0 1px 3px rgba(10, 14, 24, 0.18);
+  user-select: none;
+}
+
+/* ── Feed ─────────────────────────────────────────────────── */
+.feedTabs {
+  margin-bottom: 18px;
+}
+.feedTabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.feedTabs svg {
+  width: 15px;
+  height: 15px;
+}
+
+.posts {
+  display: grid;
+  gap: 16px;
+}
+
+.post {
+  border-radius: var(--r-l);
+  overflow: hidden;
+  box-shadow: var(--shadow-s);
+  animation: rise 0.45s var(--ease) backwards;
+}
+
+.postHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px 11px;
+}
+.postAuthor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+  border-radius: var(--r-pill);
+  transition: opacity 0.2s;
+}
+.postAuthor:hover {
+  opacity: 0.75;
+}
+.postAuthorText {
+  display: grid;
+  min-width: 0;
+}
+.postName {
+  font-size: 14.5px;
+  font-weight: 640;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.postHandle {
+  font-size: 12.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.postTime {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+/* Die Stimmungsfläche trägt die Karte – sie ersetzt das Foto. */
+.postHero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 168px;
+  padding: 26px 22px;
+  background:
+    radial-gradient(120% 100% at 30% 15%, color-mix(in oklab, var(--mood) 42%, transparent), transparent 70%),
+    linear-gradient(155deg,
+      color-mix(in oklab, var(--mood) 30%, transparent),
+      color-mix(in oklab, var(--mood) 12%, transparent));
+  transition: transform 0.5s var(--ease);
+}
+.post:hover .postHero {
+  transform: scale(1.015);
+}
+.postFace {
+  font-size: 54px;
+  line-height: 1;
+  filter: drop-shadow(0 6px 14px rgba(10, 14, 24, 0.22));
+}
+.postMood {
+  font-size: 13px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--mood) 70%, var(--text));
+}
+/* Ohne Stimmung trägt der erste Satz die Karte. */
+.postHeroQuiet {
+  min-height: 140px;
+  background: linear-gradient(155deg,
+    color-mix(in oklab, var(--accent) 16%, transparent),
+    color-mix(in oklab, var(--accent) 5%, transparent));
+}
+.postOpener {
+  font-family: var(--font-read);
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 500;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--text);
+  max-width: 28ch;
+}
+
+.postBody {
+  padding: 14px 16px 2px;
+}
+.postTitle {
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.postText {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+.postTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.postActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 11px;
+}
+.postAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 570;
+  transition: background 0.2s, color 0.2s, transform 0.25s var(--spring);
+}
+.postAction svg {
+  width: 18px;
+  height: 18px;
+}
+.postAction:hover {
+  background: var(--fill);
+  color: var(--text);
+}
+.postAction:active {
+  transform: scale(0.94);
+}
+.postActionOn {
+  color: var(--danger);
+}
+.postActionOn svg {
+  fill: color-mix(in oklab, var(--danger) 85%, transparent);
+  animation: heart 0.4s var(--spring);
+}
+@keyframes heart {
+  40% {
+    transform: scale(1.3);
+  }
+}
+
+.loadMore {
+  margin-top: 16px;
+}
+.skeletonPost {
+  height: 300px;
+  border-radius: var(--r-l);
+}
+
+/* ── Vorschläge ───────────────────────────────────────────── */
+.emptyFeed {
+  padding: 20px 0;
+  text-align: center;
+}
+.people {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+  text-align: left;
+}
+.peopleTitle {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 2px;
+}
+.personRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow-s);
+}
+.person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.personText {
+  display: grid;
+  min-width: 0;
+}
+.personName {
+  font-size: 14.5px;
+  font-weight: 620;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.personMeta {
+  font-size: 12.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.personRow .btn {
+  min-height: 38px;
+  padding: 0 15px;
+  font-size: 14px;
+}
+
+/* ── Profil ───────────────────────────────────────────────── */
+.backBtn {
+  display: inline-flex;
+  gap: 4px;
+  margin: 6px 0 2px -6px;
+}
+.backBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.profileHead {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  padding: 18px 0 24px;
+}
+.profileAvatar {
+  box-shadow: inset 0 -3px 10px rgba(0, 0, 0, 0.22), inset 0 2px 4px rgba(255, 255, 255, 0.4),
+    0 8px 24px color-mix(in oklab, var(--accent) 18%, transparent);
+  margin-bottom: 14px;
+}
+.profileName {
+  font-size: 25px;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+}
+.profileHandle {
+  font-size: 14.5px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+.profileBio {
+  margin-top: 10px;
+  max-width: 40ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+.profileStats {
+  display: flex;
+  gap: 22px;
+  margin: 18px 0 16px;
+}
+.profileStat {
+  display: grid;
+  gap: 1px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.profileStat b {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.profileActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.profileEditor {
+  display: grid;
+  gap: 6px;
+}
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-top: 8px;
+}
+.handleField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.handleField > span {
+  font-size: 17px;
+  font-weight: 620;
+  color: var(--text-3);
+}
+.bioField {
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: var(--r-s);
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+}
+.bioField:focus {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 32%, transparent);
+}
+
+/* ── Sichtbarkeit im Editor ───────────────────────────────── */
+.visibility {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.visibilityRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.visOption {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: var(--r-s);
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1.5px transparent;
+  text-align: left;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.visOption svg {
+  width: 19px;
+  height: 19px;
+  color: var(--text-3);
+  margin-bottom: 3px;
+}
+.visName {
+  font-size: 14.5px;
+  font-weight: 620;
+}
+.visHint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-3);
+}
+.visOption:hover {
+  background: var(--fill-2);
+}
+.visOption[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--accent) 55%, transparent);
+}
+.visOption[aria-pressed="true"] svg,
+.visOption[aria-pressed="true"] .visName {
+  color: color-mix(in oklab, var(--accent) 80%, var(--text));
+}
+.visWarning {
+  margin-top: 10px;
+  padding: 10px 13px;
+  border-radius: var(--r-s);
+  background: color-mix(in oklab, var(--m5) 14%, transparent);
+  color: color-mix(in oklab, var(--m5) 72%, var(--text));
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-weight: 560;
+}
+
+/* ── Beitrag mit Kommentaren ──────────────────────────────── */
+.postSheetBody {
+  gap: 14px;
+}
+.postAuthorLarge {
+  flex: none;
+}
+.postHeroSheet {
+  border-radius: var(--r-m);
+  min-height: 150px;
+}
+.postSheetTitle {
+  font-size: 22px;
+  font-weight: 690;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+.postSheetText {
+  font-family: var(--font-read);
+  font-size: 17px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  text-wrap: pretty;
+}
+.postStamp {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.postActionsSheet {
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+  padding-top: 10px;
+}
+
+.comments {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+}
+.commentsTitle {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.commentsHint {
+  font-size: 14px;
+  color: var(--text-3);
+}
+.comment {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+.commentAvatar {
+  border-radius: 50%;
+}
+.commentBody {
+  min-width: 0;
+}
+.commentMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.commentName {
+  font-size: 13.5px;
+  font-weight: 630;
+}
+.commentTime {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.commentText {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.commentDelete {
+  width: 30px;
+  height: 30px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.commentDelete svg {
+  width: 15px;
+  height: 15px;
+}
+.comment:hover .commentDelete,
+.commentDelete:focus-visible {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .commentDelete {
+    opacity: 0.55;
+  }
+}
+
+.commentForm {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline);
+}
+.commentInput {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 15px;
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+.commentInput:focus {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.commentSend {
+  width: 42px;
+  height: 42px;
+  color: var(--accent);
+}
+.commentSend:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.commentError {
+  position: absolute;
+  top: -26px;
+  left: 16px;
+  font-size: 12.5px;
+  color: var(--danger);
+}
+
+/* Profil-Tab trägt das eigene Bild */
+.tabProfile .tabAvatar {
+  box-shadow: inset 0 -1px 3px rgba(0, 0, 0, 0.25);
+}
+.tabActive .tabAvatar {
+  outline: 2px solid color-mix(in oklab, var(--accent) 65%, transparent);
+  outline-offset: 1.5px;
+}
+
+@media (min-width: 700px) {
+  .postHero {
+    min-height: 200px;
+  }
+}
+
+/* Im eigenen Journal auf einen Blick sichtbar, was öffentlich steht. */
+.entryPublic {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+.entryPublic svg {
+  stroke-width: 1.9;
+}

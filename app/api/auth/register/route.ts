@@ -10,6 +10,7 @@ import {
   tooManyAttempts,
 } from "@/lib/server/auth";
 import { ensureSchema, isConfigured } from "@/lib/server/db";
+import { ensureProfile } from "@/lib/server/social";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
+    // Ohne Handle gäbe es kein Profil, unter dem die Person auffindbar wäre.
+    await ensureProfile(result.id, result.email);
     clearAttempts(`register:${ip}`);
     await startSession(result);
     return NextResponse.json({ user: result });
