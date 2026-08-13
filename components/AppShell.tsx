@@ -174,17 +174,20 @@ export function AppShell() {
         {view === "settings" && <SettingsView install={install} />}
       </main>
 
-      <TabBar view={view} onView={setView} />
-
-      <button
-        className="compose glass"
-        type="button"
-        aria-label="Neuer Eintrag"
-        title="Neuer Eintrag (N)"
-        onClick={openNew}
-      >
-        <IconPlus />
-      </button>
+      {/* Tableiste und Schreiben-Knopf teilen sich eine Zeile – so können sie
+          sich auf schmalen Geräten nicht überlagern. */}
+      <div className="dock">
+        <TabBar view={view} onView={setView} />
+        <button
+          className="compose glass"
+          type="button"
+          aria-label="Neuer Eintrag"
+          title="Neuer Eintrag (N)"
+          onClick={openNew}
+        >
+          <IconPlus />
+        </button>
+      </div>
 
       {editing && (
         <EditorSheet

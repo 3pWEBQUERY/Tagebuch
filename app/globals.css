@@ -453,13 +453,25 @@ body:has(dialog[open]) .blob {
   flex: none;
 }
 
-/* Tabbar — schwebende Glaspille */
-.tabbar {
+/* Dock — Tableiste und Schreiben-Knopf in einer Zeile.
+   Beide liegen im selben Flexfluss, eine Überlappung ist damit ausgeschlossen. */
+.dock {
   position: fixed;
   z-index: 45;
   left: 50%;
   translate: -50% 0;
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  width: min(100% - 28px, 470px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Tabbar — schwebende Glaspille */
+.tabbar {
+  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -480,11 +492,12 @@ body:has(dialog[open]) .blob {
 }
 .tab {
   position: relative;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  width: 86px;
   padding: 8px 0 7px;
   border-radius: var(--r-pill);
   color: var(--text-2);
@@ -520,12 +533,10 @@ body:has(dialog[open]) .blob {
 
 /* Compose */
 .compose {
-  position: fixed;
-  z-index: 45;
-  right: max(18px, env(safe-area-inset-right));
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  width: 62px;
-  height: 62px;
+  position: relative;
+  flex: none;
+  width: 60px;
+  height: 60px;
   display: grid;
   place-items: center;
   border-radius: var(--r-pill);
@@ -648,16 +659,12 @@ main {
   stroke-width: 2.4;
 }
 
+/* Umbruch statt Querscrollen: ein halb abgeschnittener Filter sieht aus
+   wie ein Fehler, und niemand scrollt eine Filterzeile freiwillig. */
 .chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  margin-inline: calc(-1 * var(--pad));
-  padding-inline: var(--pad);
-}
-.chips::-webkit-scrollbar {
-  display: none;
 }
 .chip {
   display: inline-flex;
@@ -1456,25 +1463,6 @@ mark {
 
 /* ── 11 Breakpoints & Motion ──────────────────────────────── */
 
-/* Schmale Geräte: Tableiste füllt die Breite, der Schreiben-Knopf sitzt daneben
-   statt darüber – sonst überlappen beide. */
-@media (max-width: 520px) {
-  .tabbar {
-    left: max(14px, env(safe-area-inset-left));
-    right: calc(72px + max(14px, env(safe-area-inset-right)));
-    translate: none;
-  }
-  .tab {
-    width: auto;
-    flex: 1 1 0;
-  }
-  .compose {
-    right: max(14px, env(safe-area-inset-right));
-    width: 58px;
-    height: 58px;
-  }
-}
-
 @media (min-width: 700px) {
   .stats {
     grid-template-columns: repeat(4, 1fr);
@@ -1511,18 +1499,26 @@ mark {
     padding-left: 132px;
     max-width: calc(var(--measure) + 172px);
   }
-  .tabbar {
+  /* Ab hier wird aus dem Dock eine senkrechte Leiste am linken Rand. */
+  .dock {
     left: 24px;
     translate: none;
     top: 50%;
     bottom: auto;
     transform: translateY(-50%);
+    width: auto;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .tabbar {
+    flex: none;
     flex-direction: column;
     gap: 4px;
     border-radius: var(--r-xl);
     padding: 8px;
   }
   .tab {
+    flex: none;
     width: 68px;
     padding: 12px 0 10px;
     border-radius: var(--r-m);
@@ -1531,9 +1527,6 @@ mark {
     border-radius: var(--r-m);
   }
   .compose {
-    right: auto;
-    left: 24px;
-    bottom: 28px;
     width: 68px;
     height: 68px;
   }

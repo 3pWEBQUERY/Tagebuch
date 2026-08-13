@@ -1,7 +1,9 @@
 /* Tagebuch — Service Worker
    Ziel: die App startet offline sofort, Einträge liegen ohnehin in IndexedDB. */
 
-const VERSION = "tagebuch-v1";
+/* Version bei jeder Auslieferung hochzählen – alte Caches werden beim
+   Aktivieren entfernt, sonst hält eine installierte App die alte Oberfläche fest. */
+const VERSION = "tagebuch-v2";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 
