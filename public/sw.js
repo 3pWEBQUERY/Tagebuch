@@ -1,0 +1,74 @@
+/* Tagebuch — Service Worker
+   Ziel: die App startet offline sofort, Einträge liegen ohnehin in IndexedDB. */
+
+const VERSION = "tagebuch-v1";
+const SHELL = `${VERSION}-shell`;
+const RUNTIME = `${VERSION}-runtime`;
+
+const PRECACHE = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(SHELL)
+      .then((cache) => cache.addAll(PRECACHE))
+      .catch(() => undefined),
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
+  );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Seitenaufrufe: erst Netz (frische Version), sonst die gecachte Hülle.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      (async () => {
+        try {
+          const fresh = await fetch(request);
+          const cache = await caches.open(SHELL);
+          cache.put("/", fresh.clone());
+          return fresh;
+        } catch {
+          const cache = await caches.open(SHELL);
+          return (await cache.match(request)) || (await cache.match("/")) || Response.error();
+        }
+      })(),
+    );
+    return;
+  }
+
+  // Statische Assets: sofort aus dem Cache, im Hintergrund erneuern.
+  event.respondWith(
+    (async () => {
+      const cached = await caches.match(request);
+      const network = fetch(request)
+        .then((response) => {
+          if (response.ok && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(RUNTIME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => undefined);
+      return cached || (await network) || Response.error();
+    })(),
+  );
+});

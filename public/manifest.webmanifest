@@ -1,0 +1,30 @@
+{
+  "name": "Tagebuch",
+  "short_name": "Tagebuch",
+  "description": "Ein ruhiges, privates Tagebuch für Gedanken und Gefühle. Funktioniert offline, alle Daten bleiben auf deinem Gerät.",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#e9ecf4",
+  "theme_color": "#e9ecf4",
+  "categories": ["lifestyle", "productivity", "health"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Neuer Eintrag",
+      "short_name": "Neu",
+      "description": "Direkt einen Eintrag schreiben",
+      "url": "/?new=1",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tagebuch
 
-## Getting Started
+Eine installierbare Tagebuch-App (PWA) für Gedanken und Gefühle – mit Stimmungs­erfassung,
+Verlauf, Hell-/Dunkelmodus und einer Oberfläche im Liquid-Glass-Stil.
 
-First, run the development server:
+Alle Einträge liegen **ausschließlich auf dem Gerät** (IndexedDB). Kein Konto, kein Server,
+keine Übertragung. Der Export als JSON ist die Sicherung.
+
+## Funktionen
+
+- **Schreiben** – Titel (optional), Fließtext, Themen-Tags, Favoriten. Automatisches Sichern
+  beim Tippen, leere Einträge verschwinden von selbst.
+- **Stimmung** – fünf Stufen von „Schwer“ bis „Großartig“, jede mit eigener Farbe.
+- **Finden** – Volltextsuche über Titel, Text und Themen, dazu Filter für Favoriten,
+  gute und schwere Tage. Treffer werden hervorgehoben.
+- **Verlauf** – Serie in Tagen, Anzahl Einträge, Wörter, Ø Stimmung, Stimmungskurve der
+  letzten 30 Tage, Verteilung und häufige Themen.
+- **Aussehen** – Hell / Dunkel / System, sechs Akzentfarben, respektiert
+  `prefers-reduced-motion`.
+- **PWA** – installierbar, offline nutzbar, App-Shortcut „Neuer Eintrag“.
+- **Bedienung** – Tastatur (`N` neuer Eintrag, `/` Suche, `Esc` schließen), sichtbarer
+  Fokus, Screenreader-Beschriftungen, Touch-Ziele ≥ 44 px.
+
+## Technik
+
+| | |
+|---|---|
+| Framework | Next.js 16 (App Router, React 19, TypeScript) |
+| Ausgabe | statischer Export (`output: "export"`) – läuft auf jedem Static-Host |
+| Speicher | IndexedDB (Einträge), localStorage (Theme, Akzentfarbe) |
+| Styling | eigenes CSS-Design-System, keine UI-Bibliothek |
+| Offline | eigener Service Worker (`public/sw.js`) |
+
+## Entwicklung
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Produktionsbuild – erzeugt den statischen Export nach `out/`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Das Ergebnis lässt sich direkt ausliefern, z. B.:
 
-## Learn More
+```bash
+npx serve out
+```
 
-To learn more about Next.js, take a look at the following resources:
+> Der Service Worker ist nur im Produktionsbuild aktiv, damit die Entwicklung nicht
+> gegen den Cache läuft.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Aufbau
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/        Layout, Seite, globales Design-System (globals.css)
+components/ Oberfläche: Journal, Editor, Verlauf, Einstellungen, Navigation
+lib/        Daten (IndexedDB), Zustand, Datums- und Textformate, Typen
+public/     Manifest, Service Worker, Icons
+```
 
-## Deploy on Vercel
+## Datenschutz
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Es werden keine Daten erhoben, gesendet oder mit Dritten geteilt. Wer die App deinstalliert
+oder die Websitedaten löscht, löscht auch die Einträge – deshalb vorher exportieren.
