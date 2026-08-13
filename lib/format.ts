@@ -20,6 +20,8 @@ const fmtShort = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short
 
 export const time = (ts: number) => fmtTime.format(ts);
 export const fullDate = (ts: number) => fmtFull.format(ts);
+/** Ohne Jahr – für den Kopfbereich, der ohnehin „heute“ meint. */
+export const weekdayDate = (ts: number) => fmtWeekday.format(ts);
 export const stamp = (ts: number) => `${fmtStamp.format(ts)} Uhr`;
 export const shortDate = (ts: number) => fmtShort.format(ts);
 

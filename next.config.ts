@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   // beliebigen Static-Host (oder offline aus dem SW-Cache) läuft.
   output: "export",
   images: { unoptimized: true },
+  // Das Dev-Overlay sitzt sonst genau auf der Tableiste.
+  devIndicators: false,
 };
 
 export default nextConfig;

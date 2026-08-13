@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useClientValue } from "@/lib/client-value";
-import { dayKey, dayLabel, fullDate, greeting, plural } from "@/lib/format";
+import { dayKey, dayLabel, greeting, plural, weekdayDate } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import type { Entry } from "@/lib/types";
 import { EntryCard } from "./EntryCard";
@@ -40,7 +40,7 @@ type Props = {
 export function JournalView({ query, onQuery, filter, onFilter, onOpen, onNew, searchRef }: Props) {
   const { entries, loaded } = useStore();
   // Erst im Browser – ein vorgerendertes Datum wäre das des Builds.
-  const today = useClientValue(() => `${greeting()} · ${fullDate(Date.now())}`, "");
+  const today = useClientValue(() => `${greeting()} · ${weekdayDate(Date.now())}`, "");
 
   const visible = useMemo(
     () =>

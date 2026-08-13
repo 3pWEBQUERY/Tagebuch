@@ -15,7 +15,7 @@
   --bg-deep: #dfe4ef;
   --text: #12141a;
   --text-2: #565f70;
-  --text-3: #8b93a4;
+  --text-3: #60697a;
 
   --glass: rgba(255, 255, 255, 0.58);
   --glass-2: rgba(255, 255, 255, 0.42);
@@ -68,7 +68,7 @@
   --bg-deep: #05070b;
   --text: #f3f5fa;
   --text-2: #a2abbd;
-  --text-3: #6e7787;
+  --text-3: #7c8695;
 
   --glass: rgba(255, 255, 255, 0.075);
   --glass-2: rgba(255, 255, 255, 0.05);
@@ -227,6 +227,12 @@ input[type="search"]::-webkit-search-cancel-button {
   left: 12vmax;
   animation: drift-c 38s var(--ease-soft) infinite alternate;
 }
+/* Liegt ein Dialog darüber, sieht man die Bewegung ohnehin nicht –
+   ein animierter Hintergrund unter einem 40-px-Blur ist reine Rechenlast. */
+body:has(dialog[open]) .blob {
+  animation-play-state: paused;
+}
+
 @keyframes drift-a {
   to {
     transform: translate3d(14vmax, 8vmax, 0) scale(1.15);
@@ -481,7 +487,7 @@ input[type="search"]::-webkit-search-cancel-button {
   width: 86px;
   padding: 8px 0 7px;
   border-radius: var(--r-pill);
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 11px;
   font-weight: 590;
   transition: color 0.22s var(--ease), transform 0.3s var(--spring);
@@ -700,8 +706,9 @@ main {
   font-size: 13px;
   font-weight: 640;
   color: var(--text-2);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--bg) 70%, transparent) 60%, transparent);
-  backdrop-filter: blur(6px);
+  /* nur ein Hauch Grundton – als sichtbares Band würde es die Liste zerschneiden */
+  background: linear-gradient(180deg, color-mix(in oklab, var(--bg) 42%, transparent) 55%, transparent);
+  backdrop-filter: blur(10px);
 }
 .list > .groupHead:first-child {
   margin-top: 4px;
@@ -978,12 +985,15 @@ mark {
   font-size: 16px;
 }
 .distTrack {
+  display: block;
   height: 9px;
   border-radius: var(--r-pill);
   background: var(--fill);
   overflow: hidden;
 }
 .distBar {
+  display: block;
+  min-width: 3px;
   height: 100%;
   border-radius: var(--r-pill);
   background: var(--mood);
@@ -1445,6 +1455,26 @@ mark {
 }
 
 /* ── 11 Breakpoints & Motion ──────────────────────────────── */
+
+/* Schmale Geräte: Tableiste füllt die Breite, der Schreiben-Knopf sitzt daneben
+   statt darüber – sonst überlappen beide. */
+@media (max-width: 520px) {
+  .tabbar {
+    left: max(14px, env(safe-area-inset-left));
+    right: calc(72px + max(14px, env(safe-area-inset-right)));
+    translate: none;
+  }
+  .tab {
+    width: auto;
+    flex: 1 1 0;
+  }
+  .compose {
+    right: max(14px, env(safe-area-inset-right));
+    width: 58px;
+    height: 58px;
+  }
+}
+
 @media (min-width: 700px) {
   .stats {
     grid-template-columns: repeat(4, 1fr);
