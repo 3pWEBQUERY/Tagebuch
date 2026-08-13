@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthenticated } from "@/lib/server/auth";
 import { ensureSchema, getPool, isConfigured } from "@/lib/server/db";
 import { normalizeEntry, type Entry } from "@/lib/types";
 
@@ -59,6 +60,17 @@ const UPSERT_TOMBSTONE = `
    WHERE entries.updated_at <= EXCLUDED.updated_at
 `;
 
+/**
+ * Grabsteine sind irgendwann erledigt. 90 Tage sind der Kompromiss: lange genug,
+ * dass ein selten genutztes Zweitgerät die Löschung noch mitbekommt, kurz genug,
+ * dass die Tabelle nicht endlos mit Leichen wächst.
+ */
+const PRUNE_TOMBSTONES = `
+  DELETE FROM entries
+   WHERE deleted_at IS NOT NULL
+     AND deleted_at < now() - interval '90 days'
+`;
+
 type Row = {
   id: string;
   created_at: string;
@@ -99,6 +111,10 @@ function notConfigured() {
   );
 }
 
+function locked() {
+  return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+}
+
 function failed(err: unknown) {
   const message = err instanceof Error ? err.message : "Unbekannter Fehler";
   console.error("[api/entries]", message);
@@ -107,6 +123,7 @@ function failed(err: unknown) {
 
 /** Nur abholen – für einen Abgleich ohne eigene Änderungen. */
 export async function GET(request: Request) {
+  if (!(await isAuthenticated())) return locked();
   if (!isConfigured()) return notConfigured();
   const since = Number(new URL(request.url).searchParams.get("since") ?? 0) || 0;
   try {
@@ -120,6 +137,7 @@ export async function GET(request: Request) {
 
 /** Eigene Änderungen schicken und im selben Zug die fremden abholen. */
 export async function POST(request: Request) {
+  if (!(await isAuthenticated())) return locked();
   if (!isConfigured()) return notConfigured();
 
   let payload: SyncRequest;
@@ -159,6 +177,7 @@ export async function POST(request: Request) {
       for (const t of deletions) {
         await client.query(UPSERT_TOMBSTONE, [t.id, t.deletedAt]);
       }
+      await client.query(PRUNE_TOMBSTONES);
       // Erst nach dem Schreiben lesen, damit der Aufrufer einen konsistenten Stand bekommt.
       const { rows } = await client.query<Row>(SELECT_CHANGED, [since]);
       await client.query("COMMIT");

@@ -1404,6 +1404,79 @@ mark {
   transition: opacity 0.4s;
 }
 
+/* Sperrbildschirm */
+.lock {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.lockCard {
+  width: min(380px, 100%);
+  padding: 30px 26px 26px;
+  border-radius: var(--r-xl);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 12px;
+  box-shadow: var(--shadow-l);
+  animation: confirm-in 0.45s var(--spring);
+}
+.lockMark {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  margin-bottom: 4px;
+  color: #fff;
+  background: linear-gradient(
+    150deg,
+    color-mix(in oklab, var(--accent) 92%, #fff) 0%,
+    var(--accent) 60%,
+    color-mix(in oklab, var(--accent) 78%, #000) 100%
+  );
+  box-shadow: 0 6px 20px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+.lockMark svg {
+  width: 30px;
+  height: 30px;
+  stroke-width: 1.5;
+}
+.lockTitle {
+  font-size: 26px;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+}
+.lockText {
+  font-size: 14.5px;
+  color: var(--text-2);
+  max-width: 30ch;
+  margin-bottom: 4px;
+}
+.lockField {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--fill);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 16px;
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+.lockField:focus {
+  box-shadow: inset 0 0 0 1px transparent, 0 0 0 3px color-mix(in oklab, var(--accent) 32%, transparent);
+}
+.lockError {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--danger);
+}
+
 /* ── 10 Overlays ──────────────────────────────────────────── */
 .confirm {
   width: min(340px, calc(100% - 40px));

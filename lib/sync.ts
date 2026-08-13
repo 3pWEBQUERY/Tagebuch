@@ -36,6 +36,14 @@ export class SyncOffline extends Error {
   }
 }
 
+/** Sitzung fehlt oder ist abgelaufen – die Oberfläche muss nach der Passphrase fragen. */
+export class SyncLocked extends Error {
+  constructor() {
+    super("Nicht angemeldet");
+    this.name = "SyncLocked";
+  }
+}
+
 /** Der Server hat keine Datenbank konfiguriert – automatisches Wiederholen ist zwecklos. */
 export class SyncDisabled extends Error {
   constructor(message: string) {
@@ -102,6 +110,7 @@ export async function syncEntries(local: Entry[]): Promise<SyncOutcome> {
       .json()
       .then((d: { error?: string }) => d.error)
       .catch(() => undefined);
+    if (response.status === 401) throw new SyncLocked();
     if (response.status === 503) throw new SyncDisabled(detail ?? "Keine Datenbank verbunden");
     throw new Error(detail ?? `Abgleich fehlgeschlagen (${response.status})`);
   }
@@ -137,4 +146,48 @@ export async function syncEntries(local: Entry[]): Promise<SyncOutcome> {
   localStorage.setItem(PULL_KEY, String(data.serverTime));
 
   return { applied, removed, pushed: changed.length + deletions.length, serverTime: data.serverTime };
+}
+
+/* ── Sitzung ────────────────────────────────────────────────
+   Das Cookie setzt der Server (httpOnly); hier wird nur gefragt und angemeldet. */
+
+const UNLOCKED_KEY = "tb:unlocked";
+
+export type SessionState = { required: boolean; authenticated: boolean };
+
+/** Merkt sich, dass dieses Gerät schon einmal offen war – für den Offline-Start. */
+export function wasUnlocked(): boolean {
+  // Wird auch beim Prerender aufgerufen, wo es keinen Speicher gibt.
+  if (typeof localStorage === "undefined") return false;
+  return localStorage.getItem(UNLOCKED_KEY) === "1";
+}
+
+export async function readSession(): Promise<SessionState> {
+  const response = await fetch("/api/session", { cache: "no-store" });
+  if (!response.ok) throw new Error("Sitzungsstatus nicht abrufbar");
+  const state = (await response.json()) as SessionState;
+  if (state.authenticated) localStorage.setItem(UNLOCKED_KEY, "1");
+  return state;
+}
+
+export async function unlock(password: string): Promise<void> {
+  const response = await fetch("/api/session", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  if (!response.ok) {
+    const detail = await response
+      .json()
+      .then((d: { error?: string }) => d.error)
+      .catch(() => undefined);
+    throw new Error(detail ?? "Anmeldung fehlgeschlagen");
+  }
+  localStorage.setItem(UNLOCKED_KEY, "1");
+}
+
+export async function lockAgain(): Promise<void> {
+  await fetch("/api/session", { method: "DELETE" });
+  localStorage.removeItem(UNLOCKED_KEY);
+  resetSyncMarks();
 }

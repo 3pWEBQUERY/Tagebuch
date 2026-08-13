@@ -14,10 +14,14 @@ import * as db from "./db";
 import {
   forceFullPush,
   lastSyncedAt,
+  lockAgain,
+  readSession,
   recordDeletion,
   SyncDisabled,
+  SyncLocked,
   SyncOffline,
   syncEntries,
+  type SessionState,
 } from "./sync";
 import { ACCENTS, type Entry, type ThemePref } from "./types";
 
@@ -30,7 +34,7 @@ export type Toast = {
   action?: { label: string; run: () => void };
 };
 
-export type SyncStatus = "idle" | "syncing" | "offline" | "error" | "disabled";
+export type SyncStatus = "idle" | "syncing" | "offline" | "error" | "disabled" | "locked";
 
 export type SyncState = {
   status: SyncStatus;
@@ -38,11 +42,16 @@ export type SyncState = {
   error: string | null;
 };
 
+export type Session = SessionState & { checked: boolean };
+
 type Store = {
   entries: Entry[];
   loaded: boolean;
   sync: SyncState;
   syncNow: () => Promise<void>;
+  session: Session;
+  markUnlocked: () => void;
+  lockDevice: () => Promise<void>;
   save: (entry: Entry) => Promise<void>;
   remove: (id: string, options?: { undo?: boolean }) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -88,6 +97,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accent, setAccentState] = useState<string>(readAccent);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [sync, setSync] = useState<SyncState>({ status: "idle", lastSyncedAt: null, error: null });
+  const [session, setSession] = useState<Session>({
+    required: false,
+    authenticated: true,
+    checked: false,
+  });
   const toastId = useRef(0);
   /** Immer der aktuelle Stand – der Abgleich läuft außerhalb des Renderzyklus. */
   const entriesRef = useRef<Entry[]>(entries);
@@ -116,6 +130,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /* Verlangt der Server eine Passphrase? Ohne Antwort bleibt die App bedienbar. */
+  useEffect(() => {
+    readSession()
+      .then((state) => setSession({ ...state, checked: true }))
+      .catch(() => setSession((s) => ({ ...s, checked: true })));
+  }, []);
+
   /* ── Abgleich mit der Datenbank ───────────────────────────
      Läuft immer nach dem lokalen Schreiben; scheitert er, bleibt der
      Eintrag trotzdem auf dem Gerät und geht beim nächsten Lauf mit. */
@@ -137,6 +158,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (err instanceof SyncOffline) {
         setSync((s) => ({ ...s, status: "offline", error: null }));
+      } else if (err instanceof SyncLocked) {
+        setSession((s) => ({ ...s, required: true, authenticated: false, checked: true }));
+        setSync((s) => ({ ...s, status: "locked", error: null }));
       } else if (err instanceof SyncDisabled) {
         setSync((s) => ({ ...s, status: "disabled", error: err.message }));
       } else {
@@ -149,6 +173,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } finally {
       syncing.current = false;
     }
+  }, []);
+
+  const markUnlocked = useCallback(() => {
+    setSession({ required: true, authenticated: true, checked: true });
+    void runSync();
+  }, [runSync]);
+
+  const lockDevice = useCallback(async () => {
+    await lockAgain();
+    setSession((s) => ({ ...s, authenticated: false }));
+    setSync({ status: "locked", lastSyncedAt: null, error: null });
   }, []);
 
   /** Nach Änderungen kurz warten – Tippen soll nicht jeden Anschlag hochladen. */
@@ -288,6 +323,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loaded,
       sync,
       syncNow: runSync,
+      session,
+      markUnlocked,
+      lockDevice,
       save,
       remove,
       toggleFavorite,
@@ -306,6 +344,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loaded,
       sync,
       runSync,
+      session,
+      markUnlocked,
+      lockDevice,
       save,
       remove,
       toggleFavorite,

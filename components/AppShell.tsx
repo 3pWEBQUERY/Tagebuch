@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScrolledPast } from "@/lib/client-value";
 import { useInstallPrompt } from "@/lib/install";
+import { wasUnlocked } from "@/lib/sync";
 import { useStore } from "@/lib/store";
 import type { Entry } from "@/lib/types";
 import { EditorSheet } from "./EditorSheet";
 import { IconPlus } from "./icons";
 import { InsightsView } from "./InsightsView";
 import { JournalView, type Filter } from "./JournalView";
+import { LockScreen } from "./LockScreen";
 import { SettingsView } from "./SettingsView";
 import { TabBar, type ViewId } from "./TabBar";
 import { Toasts } from "./Toasts";
@@ -29,7 +31,7 @@ function createEntry(): Entry {
 }
 
 export function AppShell() {
-  const { toast } = useStore();
+  const { toast, session, markUnlocked } = useStore();
   const install = useInstallPrompt();
 
   const [view, setViewState] = useState<ViewId>("journal");
@@ -128,6 +130,25 @@ export function AppShell() {
         /* ohne SW läuft die App weiterhin, nur nicht offline */
       });
   }, [toast]);
+
+  // Ohne Netz entscheidet die Merknotiz dieses Geräts – ein Funkloch soll
+  // niemanden aus dem eigenen Tagebuch aussperren.
+  // Auf `window` prüfen, nicht auf `navigator`: letzteres gibt es in Node
+  // ebenfalls, nur ohne `onLine` – der Prerender lief damit in den Fehler.
+  const offlineGrace = typeof window !== "undefined" && !window.navigator.onLine && wasUnlocked();
+  if (session.checked && session.required && !session.authenticated && !offlineGrace) {
+    return (
+      <>
+        <div className="backdrop" aria-hidden="true">
+          <span className="blob blob1" />
+          <span className="blob blob2" />
+          <span className="blob blob3" />
+          <span className="grain" />
+        </div>
+        <LockScreen onUnlocked={markUnlocked} />
+      </>
+    );
+  }
 
   return (
     <>

@@ -19,11 +19,24 @@ const SYNC_LABEL: Record<SyncStatus, string> = {
   offline: "Offline – wird nachgeholt",
   error: "Abgleich fehlgeschlagen",
   disabled: "Keine Datenbank verbunden",
+  locked: "Gesperrt – Passphrase nötig",
 };
 
 export function SettingsView({ install }: { install: InstallState }) {
-  const { entries, theme, setTheme, accent, setAccent, importMany, wipe, toast, sync, syncNow } =
-    useStore();
+  const {
+    entries,
+    theme,
+    setTheme,
+    accent,
+    setAccent,
+    importMany,
+    wipe,
+    toast,
+    sync,
+    syncNow,
+    session,
+    lockDevice,
+  } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [askWipe, setAskWipe] = useState(false);
 
@@ -149,10 +162,15 @@ export function SettingsView({ install }: { install: InstallState }) {
               {sync.status === "syncing" ? "Läuft …" : "Jetzt abgleichen"}
             </button>
           </div>
-          <p className="cardText" style={{ margin: "4px 0 0" }}>
+          <p className="cardText" style={{ margin: "4px 0 12px" }}>
             Geschrieben wird immer zuerst auf dieses Gerät – der Abgleich mit der Datenbank läuft
             danach. Ohne Netz bleibt alles bedienbar, Änderungen gehen beim nächsten Mal mit.
           </p>
+          {session.required && (
+            <button className="btn btnFull" type="button" onClick={() => void lockDevice()}>
+              Dieses Gerät sperren
+            </button>
+          )}
         </section>
 
         <section className="card glass" aria-labelledby="data-h">
@@ -163,7 +181,9 @@ export function SettingsView({ install }: { install: InstallState }) {
           </div>
           <p className="cardText">
             Einträge werden auf dem Gerät gespeichert und mit deiner Postgres-Datenbank abgeglichen.
-            Eine Anmeldung gibt es noch nicht: Wer die Adresse dieser App kennt, sieht die Einträge.
+            {session.required
+              ? " Der Zugang ist durch eine Passphrase geschützt."
+              : " Achtung: Es ist keine Passphrase gesetzt – wer die Adresse kennt, sieht die Einträge."}{" "}
             Ein Export bleibt deine Sicherung.
           </p>
           <div className="btnRow">
