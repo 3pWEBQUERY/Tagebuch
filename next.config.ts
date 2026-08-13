@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Rein clientseitige App: statischer Export, damit sie von jedem
-  // beliebigen Static-Host (oder offline aus dem SW-Cache) läuft.
-  output: "export",
+  // Kein statischer Export mehr: die App spricht über /api/entries mit Postgres
+  // und braucht dafür eine Node-Laufzeit.
   images: { unoptimized: true },
   // Das Dev-Overlay sitzt sonst genau auf der Tableiste.
   devIndicators: false,

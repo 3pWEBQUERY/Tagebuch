@@ -3,8 +3,13 @@
 Eine installierbare Tagebuch-App (PWA) für Gedanken und Gefühle – mit Stimmungs­erfassung,
 Verlauf, Hell-/Dunkelmodus und einer Oberfläche im Liquid-Glass-Stil.
 
-Alle Einträge liegen **ausschließlich auf dem Gerät** (IndexedDB). Kein Konto, kein Server,
-keine Übertragung. Der Export als JSON ist die Sicherung.
+Geschrieben wird zuerst auf das Gerät (IndexedDB), danach gleicht die App im Hintergrund
+mit einer **Postgres-Datenbank** ab. Ohne Netz bleibt alles bedienbar; Änderungen gehen beim
+nächsten Abgleich mit.
+
+> **Kein Zugangsschutz:** Es gibt noch keine Anmeldung. Wer die Adresse der laufenden App
+> erreicht, kann alle Einträge lesen und schreiben. Vor einem öffentlichen Deployment sollte
+> ein Login oder zumindest ein geteiltes Passwort davor.
 
 ## Funktionen
 
@@ -26,8 +31,8 @@ keine Übertragung. Der Export als JSON ist die Sicherung.
 | | |
 |---|---|
 | Framework | Next.js 16 (App Router, React 19, TypeScript) |
-| Ausgabe | statischer Export (`output: "export"`) – läuft auf jedem Static-Host |
-| Speicher | IndexedDB (Einträge), localStorage (Theme, Akzentfarbe) |
+| Datenbank | PostgreSQL über `pg`, eine Tabelle, Schema legt sich beim ersten Zugriff selbst an |
+| Speicher | IndexedDB (führende Kopie), localStorage (Theme, Akzentfarbe, Sync-Marken) |
 | Styling | eigenes CSS-Design-System, keine UI-Bibliothek |
 | Offline | eigener Service Worker (`public/sw.js`) |
 
@@ -35,34 +40,52 @@ keine Übertragung. Der Export als JSON ist die Sicherung.
 
 ```bash
 npm install
+cp .env.example .env.local   # DATABASE_URL eintragen
 npm run dev
 ```
 
-Produktionsbuild – erzeugt den statischen Export nach `out/`:
+Für die lokale Entwicklung genügt eine eigene Datenbank:
+
+```bash
+createdb tagebuch_dev
+```
+
+Produktionsbuild und Start:
 
 ```bash
 npm run build
-```
-
-Das Ergebnis lässt sich direkt ausliefern, z. B.:
-
-```bash
-npx serve out
+npm start
 ```
 
 > Der Service Worker ist nur im Produktionsbuild aktiv, damit die Entwicklung nicht
 > gegen den Cache läuft.
 
+## Deployment auf Railway
+
+Das Projekt enthält zwei Dienste: `Postgres` und `Tagebuch`. Die App bekommt die
+Verbindung als Referenz, damit sie immer auf den richtigen Dienst zeigt:
+
+```bash
+railway variables --service Tagebuch --set 'DATABASE_URL=${{Postgres.DATABASE_URL}}'
+```
+
+Die interne Adresse `postgres.railway.internal` ist **nur innerhalb von Railway**
+erreichbar. Wer vom eigenen Rechner auf dieselbe Datenbank will, aktiviert beim
+Postgres-Dienst den TCP-Proxy und nutzt dessen `DATABASE_PUBLIC_URL`.
+
 ## Aufbau
 
 ```
-app/        Layout, Seite, globales Design-System (globals.css)
-components/ Oberfläche: Journal, Editor, Verlauf, Einstellungen, Navigation
-lib/        Daten (IndexedDB), Zustand, Datums- und Textformate, Typen
-public/     Manifest, Service Worker, Icons
+app/            Layout, Seite, globales Design-System (globals.css)
+app/api/entries Abgleich-Endpunkt: Änderungen entgegennehmen und ausliefern
+components/     Oberfläche: Journal, Editor, Verlauf, Einstellungen, Navigation
+lib/            IndexedDB, Zustand, Abgleich (sync.ts), Formate, Typen
+lib/server/     Datenbankpool und Schema – ausschließlich serverseitig
+public/         Manifest, Service Worker, Icons
 ```
 
 ## Datenschutz
 
-Es werden keine Daten erhoben, gesendet oder mit Dritten geteilt. Wer die App deinstalliert
-oder die Websitedaten löscht, löscht auch die Einträge – deshalb vorher exportieren.
+Die Einträge liegen auf dem Gerät und in der eigenen Datenbank – es gibt keine Dritten,
+keine Analyse, kein Tracking. Solange kein Zugangsschutz davor liegt, ist die laufende App
+allerdings für jeden erreichbar, der die Adresse kennt.

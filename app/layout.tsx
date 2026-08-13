@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Tagebuch",
   description:
-    "Ein ruhiges, privates Tagebuch für Gedanken und Gefühle. Funktioniert offline, alle Daten bleiben auf deinem Gerät.",
+    "Ein ruhiges Tagebuch für Gedanken und Gefühle. Funktioniert offline und gleicht sich mit deiner Datenbank ab.",
   applicationName: "Tagebuch",
   manifest: "/manifest.webmanifest",
   appleWebApp: {

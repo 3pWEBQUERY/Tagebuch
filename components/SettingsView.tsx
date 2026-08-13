@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { stamp } from "@/lib/format";
 import type { InstallState } from "@/lib/install";
-import { useStore } from "@/lib/store";
+import { useStore, type SyncStatus } from "@/lib/store";
 import { ACCENTS, normalizeEntry, type Entry, type ThemePref } from "@/lib/types";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -12,8 +13,17 @@ const THEMES: { id: ThemePref; label: string }[] = [
   { id: "system", label: "System" },
 ];
 
+const SYNC_LABEL: Record<SyncStatus, string> = {
+  idle: "Abgeglichen",
+  syncing: "Abgleich läuft …",
+  offline: "Offline – wird nachgeholt",
+  error: "Abgleich fehlgeschlagen",
+  disabled: "Keine Datenbank verbunden",
+};
+
 export function SettingsView({ install }: { install: InstallState }) {
-  const { entries, theme, setTheme, accent, setAccent, importMany, wipe, toast } = useStore();
+  const { entries, theme, setTheme, accent, setAccent, importMany, wipe, toast, sync, syncNow } =
+    useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [askWipe, setAskWipe] = useState(false);
 
@@ -112,6 +122,39 @@ export function SettingsView({ install }: { install: InstallState }) {
           </div>
         </section>
 
+        <section className="card glass" aria-labelledby="sync-h">
+          <div className="cardHead">
+            <h2 className="cardTitle" id="sync-h">
+              Synchronisierung
+            </h2>
+            <span className={`syncDot syncDot--${sync.status}`} aria-hidden="true" />
+          </div>
+          <div className="row rowBetween" style={{ borderTop: 0, paddingTop: 0 }}>
+            <div>
+              <span className="rowLabel">{SYNC_LABEL[sync.status]}</span>
+              <span className="rowHint">
+                {sync.error
+                  ? sync.error
+                  : sync.lastSyncedAt
+                    ? `Zuletzt abgeglichen: ${stamp(sync.lastSyncedAt)}`
+                    : "Noch kein Abgleich gelaufen."}
+              </span>
+            </div>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => void syncNow()}
+              disabled={sync.status === "syncing"}
+            >
+              {sync.status === "syncing" ? "Läuft …" : "Jetzt abgleichen"}
+            </button>
+          </div>
+          <p className="cardText" style={{ margin: "4px 0 0" }}>
+            Geschrieben wird immer zuerst auf dieses Gerät – der Abgleich mit der Datenbank läuft
+            danach. Ohne Netz bleibt alles bedienbar, Änderungen gehen beim nächsten Mal mit.
+          </p>
+        </section>
+
         <section className="card glass" aria-labelledby="data-h">
           <div className="cardHead">
             <h2 className="cardTitle" id="data-h">
@@ -119,8 +162,9 @@ export function SettingsView({ install }: { install: InstallState }) {
             </h2>
           </div>
           <p className="cardText">
-            Alle Einträge liegen ausschließlich auf diesem Gerät – kein Konto, kein Server, keine Übertragung.
-            Ein Export ist deine Sicherung.
+            Einträge werden auf dem Gerät gespeichert und mit deiner Postgres-Datenbank abgeglichen.
+            Eine Anmeldung gibt es noch nicht: Wer die Adresse dieser App kennt, sieht die Einträge.
+            Ein Export bleibt deine Sicherung.
           </p>
           <div className="btnRow">
             <button className="btn" type="button" onClick={exportJson} disabled={!entries.length}>

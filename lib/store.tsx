@@ -11,6 +11,14 @@ import {
   type ReactNode,
 } from "react";
 import * as db from "./db";
+import {
+  forceFullPush,
+  lastSyncedAt,
+  recordDeletion,
+  SyncDisabled,
+  SyncOffline,
+  syncEntries,
+} from "./sync";
 import { ACCENTS, type Entry, type ThemePref } from "./types";
 
 const THEME_KEY = "tb:theme";
@@ -22,9 +30,19 @@ export type Toast = {
   action?: { label: string; run: () => void };
 };
 
+export type SyncStatus = "idle" | "syncing" | "offline" | "error" | "disabled";
+
+export type SyncState = {
+  status: SyncStatus;
+  lastSyncedAt: number | null;
+  error: string | null;
+};
+
 type Store = {
   entries: Entry[];
   loaded: boolean;
+  sync: SyncState;
+  syncNow: () => Promise<void>;
   save: (entry: Entry) => Promise<void>;
   remove: (id: string, options?: { undo?: boolean }) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -69,7 +87,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemePref>(readTheme);
   const [accent, setAccentState] = useState<string>(readAccent);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [sync, setSync] = useState<SyncState>({ status: "idle", lastSyncedAt: null, error: null });
   const toastId = useRef(0);
+  /** Immer der aktuelle Stand – der Abgleich läuft außerhalb des Renderzyklus. */
+  const entriesRef = useRef<Entry[]>(entries);
+  const syncing = useRef(false);
+  const syncTimer = useRef<number | null>(null);
+
+  entriesRef.current = entries;
 
   /* Einträge einmalig aus IndexedDB laden */
   useEffect(() => {
@@ -78,8 +103,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .then((list) => {
         if (alive) setEntries(list.sort(byNewest));
       })
-      .catch(() => {
-        /* Speicher nicht verfügbar (z. B. privater Modus) – App bleibt bedienbar. */
+      .catch((err: unknown) => {
+        // Kein stilles Verschlucken: ohne Meldung sieht ein Lesefehler aus
+        // wie ein leeres Tagebuch.
+        console.error("[tagebuch] Einträge konnten nicht geladen werden:", err);
       })
       .finally(() => {
         if (alive) setLoaded(true);
@@ -88,6 +115,63 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       alive = false;
     };
   }, []);
+
+  /* ── Abgleich mit der Datenbank ───────────────────────────
+     Läuft immer nach dem lokalen Schreiben; scheitert er, bleibt der
+     Eintrag trotzdem auf dem Gerät und geht beim nächsten Lauf mit. */
+  const runSync = useCallback(async () => {
+    if (syncing.current) return;
+    syncing.current = true;
+    setSync((s) => ({ ...s, status: "syncing" }));
+    try {
+      const { applied, removed } = await syncEntries(entriesRef.current);
+      if (applied.length || removed.length) {
+        setEntries((list) => {
+          const map = new Map(list.map((e) => [e.id, e]));
+          applied.forEach((e) => map.set(e.id, e));
+          removed.forEach((id) => map.delete(id));
+          return [...map.values()].sort(byNewest);
+        });
+      }
+      setSync({ status: "idle", lastSyncedAt: lastSyncedAt(), error: null });
+    } catch (err) {
+      if (err instanceof SyncOffline) {
+        setSync((s) => ({ ...s, status: "offline", error: null }));
+      } else if (err instanceof SyncDisabled) {
+        setSync((s) => ({ ...s, status: "disabled", error: err.message }));
+      } else {
+        setSync((s) => ({
+          ...s,
+          status: "error",
+          error: err instanceof Error ? err.message : "Abgleich fehlgeschlagen",
+        }));
+      }
+    } finally {
+      syncing.current = false;
+    }
+  }, []);
+
+  /** Nach Änderungen kurz warten – Tippen soll nicht jeden Anschlag hochladen. */
+  const scheduleSync = useCallback(() => {
+    if (syncTimer.current) window.clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => void runSync(), 1500);
+  }, [runSync]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    void runSync();
+    const onOnline = () => void runSync();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void runSync();
+    };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (syncTimer.current) window.clearTimeout(syncTimer.current);
+    };
+  }, [loaded, runSync]);
 
   /* Theme anwenden + Systemwechsel verfolgen */
   useEffect(() => {
@@ -126,31 +210,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [dismissToast],
   );
 
-  const save = useCallback(async (entry: Entry) => {
-    setEntries((list) => {
-      const i = list.findIndex((e) => e.id === entry.id);
-      const next = i === -1 ? [entry, ...list] : list.map((e) => (e.id === entry.id ? entry : e));
-      return next.sort(byNewest);
-    });
-    await db.writeEntry(entry);
-  }, []);
+  const save = useCallback(
+    async (entry: Entry) => {
+      setEntries((list) => {
+        const i = list.findIndex((e) => e.id === entry.id);
+        const next = i === -1 ? [entry, ...list] : list.map((e) => (e.id === entry.id ? entry : e));
+        return next.sort(byNewest);
+      });
+      await db.writeEntry(entry);
+      scheduleSync();
+    },
+    [scheduleSync],
+  );
 
   const remove = useCallback(
     async (id: string, options?: { undo?: boolean }) => {
       const victim = entries.find((e) => e.id === id);
       setEntries((list) => list.filter((e) => e.id !== id));
       await db.removeEntry(id);
+      await recordDeletion(id);
+      scheduleSync();
       if (options?.undo && victim) {
         toast("Eintrag gelöscht", {
           label: "Rückgängig",
           run: () => {
-            setEntries((list) => [victim, ...list].sort(byNewest));
-            void db.writeEntry(victim);
+            // Wiederherstellen heißt: jünger als der Grabstein sein, sonst
+            // löscht der nächste Abgleich den Eintrag gleich wieder weg.
+            const revived = { ...victim, updatedAt: Date.now() };
+            setEntries((list) => [revived, ...list].sort(byNewest));
+            void db.writeEntry(revived).then(() => db.dropTombstones([id]).then(scheduleSync));
           },
         });
       }
     },
-    [entries, toast],
+    [entries, toast, scheduleSync],
   );
 
   const toggleFavorite = useCallback(
@@ -162,26 +255,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [entries, save],
   );
 
-  const importMany = useCallback(async (list: Entry[]) => {
-    if (!list.length) return 0;
-    await db.writeMany(list);
-    setEntries((current) => {
-      const map = new Map(current.map((e) => [e.id, e]));
-      list.forEach((e) => map.set(e.id, e));
-      return [...map.values()].sort(byNewest);
-    });
-    return list.length;
-  }, []);
+  const importMany = useCallback(
+    async (list: Entry[]) => {
+      if (!list.length) return 0;
+      await db.writeMany(list);
+      setEntries((current) => {
+        const map = new Map(current.map((e) => [e.id, e]));
+        list.forEach((e) => map.set(e.id, e));
+        return [...map.values()].sort(byNewest);
+      });
+      // Importierte Einträge tragen alte Zeitstempel und lägen sonst hinter
+      // der Push-Marke – einmal alles neu hochladen.
+      forceFullPush();
+      scheduleSync();
+      return list.length;
+    },
+    [scheduleSync],
+  );
 
   const wipe = useCallback(async () => {
+    // Ohne Grabsteine holt der nächste Abgleich alles aus der Datenbank zurück.
+    const now = Date.now();
+    await Promise.all(entriesRef.current.map((e) => db.writeTombstone({ id: e.id, deletedAt: now })));
     await db.removeAll();
     setEntries([]);
-  }, []);
+    scheduleSync();
+  }, [scheduleSync]);
 
   const value = useMemo<Store>(
     () => ({
       entries,
       loaded,
+      sync,
+      syncNow: runSync,
       save,
       remove,
       toggleFavorite,
@@ -198,6 +304,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [
       entries,
       loaded,
+      sync,
+      runSync,
       save,
       remove,
       toggleFavorite,

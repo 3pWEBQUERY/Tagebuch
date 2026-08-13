@@ -1074,6 +1074,34 @@ mark {
   background: var(--fill-2);
 }
 
+/* Statuspunkt der Synchronisierung */
+.syncDot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-3);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--text-3) 22%, transparent);
+}
+.syncDot--idle {
+  background: var(--m4);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--m4) 22%, transparent);
+}
+.syncDot--syncing {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+  animation: pulse 1.2s var(--ease-soft) infinite;
+}
+.syncDot--error,
+.syncDot--disabled {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--danger) 22%, transparent);
+}
+.syncDot--offline {
+  background: var(--m5);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--m5) 22%, transparent);
+}
+
 .row {
   display: flex;
   align-items: center;

@@ -1,7 +1,7 @@
 {
   "name": "Tagebuch",
   "short_name": "Tagebuch",
-  "description": "Ein ruhiges, privates Tagebuch für Gedanken und Gefühle. Funktioniert offline, alle Daten bleiben auf deinem Gerät.",
+  "description": "Ein ruhiges Tagebuch für Gedanken und Gefühle. Funktioniert offline und gleicht sich mit deiner Datenbank ab.",
   "lang": "de",
   "dir": "ltr",
   "start_url": "/",
